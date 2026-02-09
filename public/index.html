@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Legal Judge Bot</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app">
+    <!-- HEADER -->
+    <header class="header">
+      <div class="header-inner">
+        <div class="logo">
+          <div class="logo-icon">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+              <rect width="32" height="32" rx="8" fill="#1a1a2e"/>
+              <path d="M16 6L8 10v4l8 4 8-4v-4L16 6z" fill="#c9a84c" opacity="0.9"/>
+              <path d="M8 14v4l8 4 8-4v-4l-8 4-8-4z" fill="#c9a84c" opacity="0.6"/>
+              <path d="M8 18v4l8 4 8-4v-4l-8 4-8-4z" fill="#c9a84c" opacity="0.3"/>
+            </svg>
+          </div>
+          <div>
+            <h1 class="logo-title">Legal Judge Bot</h1>
+            <p class="logo-sub">AI-Powered Judicial Analysis Engine</p>
+          </div>
+        </div>
+        <nav class="nav">
+          <button class="nav-btn active" data-tab="judge">Judge a Case</button>
+          <button class="nav-btn" data-tab="knowledge">Knowledge Base</button>
+          <button class="nav-btn" data-tab="history">Case History</button>
+        </nav>
+      </div>
+    </header>
+
+    <!-- MAIN -->
+    <main class="main">
+
+      <!-- JUDGE TAB -->
+      <section class="tab-panel active" id="tab-judge">
+        <div class="split-layout">
+          <!-- LEFT: Case builder -->
+          <div class="panel case-builder">
+            <div class="panel-header">
+              <h2>Case Builder</h2>
+              <div class="demo-btns">
+                <button class="btn btn-sm btn-outline" onclick="loadDemo('contract')">Demo: Contract</button>
+                <button class="btn btn-sm btn-outline" onclick="loadDemo('tort')">Demo: Tort</button>
+              </div>
+            </div>
+
+            <form id="case-form" onsubmit="return false;">
+              <!-- Basic Info -->
+              <fieldset class="fieldset">
+                <legend>Case Information</legend>
+                <div class="form-row">
+                  <div class="form-group flex-2">
+                    <label>Case Title</label>
+                    <input type="text" id="case-title" placeholder="e.g. Smith v. Jones" required>
+                  </div>
+                  <div class="form-group flex-1">
+                    <label>Case ID</label>
+                    <input type="text" id="case-id" placeholder="e.g. 2026-001" value="">
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group flex-1">
+                    <label>Case Type</label>
+                    <select id="case-type"></select>
+                  </div>
+                  <div class="form-group flex-1">
+                    <label>Jurisdiction</label>
+                    <input type="text" id="case-jurisdiction" value="General">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Summary</label>
+                  <textarea id="case-summary" rows="2" placeholder="Brief summary of the dispute..."></textarea>
+                </div>
+              </fieldset>
+
+              <!-- Parties -->
+              <fieldset class="fieldset">
+                <legend>Parties <button type="button" class="btn btn-xs btn-add" onclick="addParty()">+ Add</button></legend>
+                <div id="parties-list"></div>
+              </fieldset>
+
+              <!-- Facts -->
+              <fieldset class="fieldset">
+                <legend>Facts <button type="button" class="btn btn-xs btn-add" onclick="addFact()">+ Add</button></legend>
+                <div id="facts-list"></div>
+              </fieldset>
+
+              <!-- Issues -->
+              <fieldset class="fieldset">
+                <legend>Legal Issues <button type="button" class="btn btn-xs btn-add" onclick="addIssue()">+ Add</button></legend>
+                <div id="issues-list"></div>
+              </fieldset>
+
+              <!-- Arguments -->
+              <fieldset class="fieldset">
+                <legend>Arguments <button type="button" class="btn btn-xs btn-add" onclick="addArgument()">+ Add</button></legend>
+                <div id="arguments-list"></div>
+              </fieldset>
+
+              <!-- Evidence -->
+              <fieldset class="fieldset">
+                <legend>Evidence <button type="button" class="btn btn-xs btn-add" onclick="addEvidence()">+ Add</button></legend>
+                <div id="evidence-list"></div>
+              </fieldset>
+
+              <!-- Applicable Statutes -->
+              <fieldset class="fieldset">
+                <legend>Applicable Statutes <button type="button" class="btn btn-xs btn-add" onclick="addStatute()">+ Add</button></legend>
+                <div id="statutes-list"></div>
+              </fieldset>
+
+              <div class="form-actions">
+                <button type="button" class="btn btn-primary btn-lg" onclick="submitCase()">
+                  <span class="btn-icon">&#9878;</span> Render Judgment
+                </button>
+                <button type="button" class="btn btn-outline btn-lg" onclick="clearForm()">Clear</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- RIGHT: Judgment display -->
+          <div class="panel judgment-panel">
+            <div class="panel-header">
+              <h2>Judicial Opinion</h2>
+              <div class="format-toggle" id="format-toggle" style="display:none;">
+                <button class="fmt-btn active" data-fmt="visual">Visual</button>
+                <button class="fmt-btn" data-fmt="text">Text</button>
+                <button class="fmt-btn" data-fmt="json">JSON</button>
+              </div>
+            </div>
+
+            <!-- Empty state -->
+            <div id="judgment-empty" class="empty-state">
+              <div class="empty-icon">
+                <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+                  <circle cx="40" cy="40" r="38" stroke="#333" stroke-width="2" stroke-dasharray="6 4"/>
+                  <path d="M40 20L24 28v8l16 8 16-8v-8L40 20z" fill="#333" opacity="0.3"/>
+                  <path d="M24 36v8l16 8 16-8v-8l-16 8-16-8z" fill="#333" opacity="0.2"/>
+                  <path d="M24 44v8l16 8 16-8v-8l-16 8-16-8z" fill="#333" opacity="0.1"/>
+                </svg>
+              </div>
+              <p class="empty-title">No judgment rendered yet</p>
+              <p class="empty-sub">Build a case on the left and click "Render Judgment" to begin analysis.</p>
+            </div>
+
+            <!-- Loading -->
+            <div id="judgment-loading" class="loading-state" style="display:none;">
+              <div class="gavel-anim">
+                <div class="gavel-head"></div>
+                <div class="gavel-strike"></div>
+              </div>
+              <p class="loading-text">Analyzing case...</p>
+              <p class="loading-sub">Applying IRAC framework &bull; Matching precedents &bull; Weighing evidence</p>
+            </div>
+
+            <!-- Result -->
+            <div id="judgment-result" style="display:none;">
+              <!-- Visual view -->
+              <div id="view-visual">
+                <div class="verdict-banner" id="verdict-banner">
+                  <div class="verdict-disposition" id="verdict-disposition"></div>
+                  <div class="verdict-meta" id="verdict-meta"></div>
+                </div>
+
+                <div class="score-cards" id="score-cards"></div>
+
+                <div class="opinion-sections" id="opinion-sections"></div>
+
+                <div class="dissent-section" id="dissent-section" style="display:none;"></div>
+              </div>
+
+              <!-- Text view -->
+              <div id="view-text" style="display:none;">
+                <pre class="opinion-text" id="opinion-text-content"></pre>
+              </div>
+
+              <!-- JSON view -->
+              <div id="view-json" style="display:none;">
+                <pre class="opinion-json" id="opinion-json-content"></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- KNOWLEDGE TAB -->
+      <section class="tab-panel" id="tab-knowledge">
+        <div class="knowledge-grid">
+          <div class="kb-stats" id="kb-stats"></div>
+          <div class="kb-section">
+            <h3>Precedents</h3>
+            <div class="search-bar">
+              <input type="text" id="prec-search" placeholder="Search precedents (e.g. negligence, contract, damages)...">
+              <button class="btn btn-sm btn-primary" onclick="searchPrecedents()">Search</button>
+            </div>
+            <div id="precedents-results"></div>
+            <div id="precedents-list-kb"></div>
+          </div>
+          <div class="kb-section">
+            <h3>Statutes</h3>
+            <div id="statutes-list-kb"></div>
+          </div>
+          <div class="kb-section">
+            <h3>Legal Principles</h3>
+            <div id="principles-list-kb"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- HISTORY TAB -->
+      <section class="tab-panel" id="tab-history">
+        <div class="history-container">
+          <h2>Decided Cases</h2>
+          <p class="history-sub">Cases judged during this session are tracked here.</p>
+          <div id="history-list" class="history-list"></div>
+        </div>
+      </section>
+
+    </main>
+
+    <footer class="footer">
+      <p>Legal Judge Bot v2.0 &mdash; AI-powered judicial analysis engine. For educational and research purposes only. Not legal advice.</p>
+    </footer>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

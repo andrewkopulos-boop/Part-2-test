@@ -29,10 +29,15 @@ class JudgeEngine:
             principles=principles,
             precedent_matcher=matcher,
         )
+        self._decided_cases: list[tuple[Case, Judgment]] = []
 
     @property
     def analyzer(self) -> LegalAnalyzer:
         return self._analyzer
+
+    @property
+    def case_history(self) -> list[tuple[Case, Judgment]]:
+        return list(self._decided_cases)
 
     # ------------------------------------------------------------------
     # Public API
@@ -45,11 +50,149 @@ class JudgeEngine:
         disposition = self._determine_disposition(analyses, case)
         remedy = self._determine_remedy(disposition, case)
         prevailing = self._determine_prevailing_party(analyses, case)
+        dissent = self._generate_dissent(analyses, case, disposition, prevailing)
         judgment = self._build_judgment(
-            case, analyses, disposition, remedy, prevailing
+            case, analyses, disposition, remedy, prevailing, dissent
         )
         case.status = CaseStatus.DECIDED
+        self._decided_cases.append((case, judgment))
         return judgment
+
+    def appeal(self, original_case: Case, original_judgment: Judgment, new_arguments: list | None = None, new_evidence: list | None = None) -> Judgment:
+        """Appeal a prior judgment with optional new arguments and evidence."""
+        appeal_case = original_case.model_copy(deep=True)
+        appeal_case.case_id = f"{original_case.case_id}-APPEAL"
+        appeal_case.status = CaseStatus.APPEALED
+
+        # Upgrade party roles for appeal context.
+        for party in appeal_case.parties:
+            if party.role == PartyRole.PLAINTIFF:
+                party.role = PartyRole.APPELLANT
+            elif party.role == PartyRole.DEFENDANT:
+                party.role = PartyRole.APPELLEE
+
+        if new_arguments:
+            appeal_case.arguments.extend(new_arguments)
+        if new_evidence:
+            appeal_case.evidence.extend(new_evidence)
+
+        # Add the original judgment's findings to facts.
+        appeal_case.facts.append(
+            f"PRIOR JUDGMENT: The lower court ruled {original_judgment.disposition.value} "
+            f"with confidence {original_judgment.confidence:.0%}, "
+            f"finding for {original_judgment.prevailing_party}."
+        )
+
+        return self.adjudicate(appeal_case)
+
+    def compare_cases(self, case_a: Case, case_b: Case) -> dict:
+        """Compare two cases and return a similarity analysis."""
+        kw_a = PrecedentMatcher._extract_case_keywords(case_a)
+        kw_b = PrecedentMatcher._extract_case_keywords(case_b)
+
+        overlap = kw_a & kw_b
+        union = kw_a | kw_b
+        keyword_similarity = len(overlap) / len(union) if union else 0.0
+
+        type_match = case_a.case_type == case_b.case_type
+        jurisdiction_match = case_a.jurisdiction == case_b.jurisdiction
+
+        # Issue overlap.
+        issues_a = {i.lower() for i in case_a.issues}
+        issues_b = {i.lower() for i in case_b.issues}
+        issue_overlap = issues_a & issues_b
+
+        overall = (
+            0.4 * keyword_similarity
+            + 0.3 * (1.0 if type_match else 0.0)
+            + 0.1 * (1.0 if jurisdiction_match else 0.0)
+            + 0.2 * (len(issue_overlap) / max(len(issues_a | issues_b), 1))
+        )
+
+        return {
+            "overall_similarity": round(overall, 3),
+            "keyword_similarity": round(keyword_similarity, 3),
+            "common_keywords": sorted(overlap)[:20],
+            "case_type_match": type_match,
+            "jurisdiction_match": jurisdiction_match,
+            "common_issues": sorted(issue_overlap),
+        }
+
+    def find_similar_in_history(self, case: Case, top_k: int = 5) -> list[dict]:
+        """Search decided cases for similar prior matters (DeepJudge-style)."""
+        results: list[dict] = []
+        for past_case, past_judgment in self._decided_cases:
+            if past_case.case_id == case.case_id:
+                continue
+            sim = self.compare_cases(case, past_case)
+            results.append({
+                "case_id": past_case.case_id,
+                "title": past_case.title,
+                "disposition": past_judgment.disposition.value,
+                "prevailing_party": past_judgment.prevailing_party,
+                **sim,
+            })
+        results.sort(key=lambda r: r["overall_similarity"], reverse=True)
+        return results[:top_k]
+
+    # ------------------------------------------------------------------
+    # Dissenting opinion generation
+    # ------------------------------------------------------------------
+
+    def _generate_dissent(
+        self,
+        analyses: list[IRACAnalysis],
+        case: Case,
+        disposition: Disposition,
+        prevailing_party: str,
+    ) -> str:
+        """Generate a dissenting opinion by arguing the other side."""
+        if not analyses or not case.parties:
+            return ""
+
+        losing_parties = [
+            p.name for p in case.parties if p.name != prevailing_party
+        ]
+        losing_name = losing_parties[0] if losing_parties else "the non-prevailing party"
+
+        # Find the losing party's strongest arguments.
+        losing_args = [a for a in case.arguments if a.party_name == losing_name]
+        losing_evidence = [e for e in case.get_admissible_evidence() if e.submitted_by == losing_name]
+
+        parts: list[str] = []
+        parts.append(
+            f"DISSENTING OPINION: The undersigned respectfully dissents from the "
+            f"majority's {disposition.value} disposition."
+        )
+
+        if losing_args:
+            parts.append(
+                f"\nThe majority fails to give sufficient weight to {losing_name}'s arguments:"
+            )
+            for arg in losing_args:
+                parts.append(f"  - {arg.claim}")
+                if arg.legal_basis:
+                    parts.append(f"    Legal basis: {', '.join(arg.legal_basis)}")
+
+        if losing_evidence:
+            parts.append(f"\nThe following evidence warrants greater consideration:")
+            for ev in losing_evidence:
+                parts.append(f"  - {ev.title}: {ev.description}")
+
+        # Challenge the weakest analysis point.
+        if analyses:
+            weakest = min(analyses, key=lambda a: a.confidence)
+            if weakest.confidence < 0.75:
+                parts.append(
+                    f"\nThe analysis on '{weakest.issue}' achieves only "
+                    f"{weakest.confidence:.0%} confidence, which is insufficient to "
+                    f"justify the majority's conclusion."
+                )
+
+        parts.append(
+            f"\nFor these reasons, the dissent would find in favor of {losing_name}."
+        )
+        return "\n".join(parts)
 
     # ------------------------------------------------------------------
     # Disposition logic
@@ -135,6 +278,7 @@ class JudgeEngine:
         disposition: Disposition,
         remedy: RemedyType,
         prevailing_party: str,
+        dissent: str = "",
     ) -> Judgment:
         avg_confidence = (
             sum(a.confidence for a in analyses) / len(analyses)
@@ -149,7 +293,7 @@ class JudgeEngine:
         )
 
         # Build structured sections.
-        sections = self._build_sections(case, analyses, disposition, remedy, prevailing_party)
+        sections = self._build_sections(case, analyses, disposition, remedy, prevailing_party, dissent)
 
         # Build summary.
         summary = (
@@ -197,6 +341,7 @@ class JudgeEngine:
             holding=holding,
             reasoning=reasoning_text,
             remedy_details=remedy_details,
+            dissent=dissent,
             confidence=avg_confidence,
             strength_of_evidence=evidence_strength,
             prevailing_party=prevailing_party,
@@ -220,6 +365,7 @@ class JudgeEngine:
         disposition: Disposition,
         remedy: RemedyType,
         prevailing_party: str,
+        dissent: str = "",
     ) -> list[JudgmentSection]:
         sections: list[JudgmentSection] = []
 
@@ -277,6 +423,13 @@ class JudgeEngine:
                     f"The court awards {remedy.value} to {prevailing_party}. "
                     f"Specific terms to be determined by further proceedings if necessary."
                 ),
+            ))
+
+        # VII. Dissent
+        if dissent:
+            sections.append(JudgmentSection(
+                heading="VII. Dissenting Opinion",
+                content=dissent,
             ))
 
         return sections

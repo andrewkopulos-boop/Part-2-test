@@ -35,17 +35,17 @@ def test_criminal_law_has_entries():
 
 def test_all_statutes_aggregation():
     all_statutes = get_all_statutes()
-    assert len(all_statutes) >= 8
+    assert len(all_statutes) >= 18  # 10 domains with statutes
 
 
 def test_all_precedents_aggregation():
     all_precedents = get_all_precedents()
-    assert len(all_precedents) >= 8
+    assert len(all_precedents) >= 20  # Expanded precedent library
 
 
 def test_all_principles_aggregation():
     all_principles = get_all_principles()
-    assert len(all_principles) >= 10
+    assert len(all_principles) >= 22  # Expanded principles
 
 
 def test_knowledge_base_defaults():

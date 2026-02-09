@@ -499,6 +499,309 @@ def _get_employment_law() -> tuple[list[Statute], list[Precedent], list[LegalPri
 
 
 # ======================================================================
+# CORPORATE LAW
+# ======================================================================
+
+
+def _get_corporate_law() -> tuple[list[Statute], list[Precedent], list[LegalPrinciple]]:
+    statutes = [
+        Statute(
+            name="Delaware General Corporation Law",
+            code="DGCL",
+            section="Title 8",
+            domain=LegalDomain.CORPORATE_LAW,
+            jurisdiction=JurisdictionType.STATE,
+            summary="Primary statute governing corporate formation, governance, and fiduciary duties in Delaware.",
+        ),
+        Statute(
+            name="Securities Exchange Act of 1934",
+            code="15 U.S.C.",
+            section="\u00a778a",
+            domain=LegalDomain.CORPORATE_LAW,
+            jurisdiction=JurisdictionType.FEDERAL,
+            summary="Regulates secondary trading of securities, including insider trading and corporate disclosure.",
+        ),
+    ]
+
+    precedents = [
+        Precedent(
+            case_name="Dodge v. Ford Motor Co.",
+            citation="204 Mich. 459",
+            year=1919,
+            domain=LegalDomain.CORPORATE_LAW,
+            jurisdiction=JurisdictionType.STATE,
+            holding="A corporation is organized primarily for the profit of stockholders; directors cannot use corporate funds for purely charitable purposes against shareholder interests.",
+            ratio_decidendi="Directors owe a fiduciary duty to maximize shareholder value.",
+            relevance_keywords=["shareholder", "fiduciary", "duty", "profit", "directors", "corporate", "dividend"],
+            authority_weight=0.85,
+        ),
+        Precedent(
+            case_name="Smith v. Van Gorkom",
+            citation="488 A.2d 858",
+            year=1985,
+            domain=LegalDomain.CORPORATE_LAW,
+            jurisdiction=JurisdictionType.STATE,
+            holding="Directors who approve a merger without adequate deliberation breach their duty of care.",
+            ratio_decidendi="The business judgment rule does not protect uninformed decisions.",
+            relevance_keywords=["duty", "care", "merger", "business", "judgment", "directors", "informed"],
+            authority_weight=0.90,
+        ),
+        Precedent(
+            case_name="Revlon Inc. v. MacAndrews & Forbes",
+            citation="506 A.2d 173",
+            year=1986,
+            domain=LegalDomain.CORPORATE_LAW,
+            jurisdiction=JurisdictionType.STATE,
+            holding="Once a sale of the company becomes inevitable, directors must act as auctioneers to obtain the best price for shareholders.",
+            ratio_decidendi="Revlon duties: board must maximize shareholder value in a change of control.",
+            relevance_keywords=["sale", "auction", "shareholder", "price", "merger", "acquisition", "control"],
+            authority_weight=0.90,
+        ),
+    ]
+
+    principles = [
+        LegalPrinciple(
+            name="Business Judgment Rule",
+            domain=LegalDomain.CORPORATE_LAW,
+            description="Courts defer to the business decisions of directors made in good faith, on an informed basis, and in the honest belief that the action was in the company's best interest.",
+            elements=["good faith", "informed decision", "no self-dealing", "rational business purpose"],
+            exceptions=["waste of corporate assets", "fraud", "self-dealing", "uninformed decisions"],
+        ),
+        LegalPrinciple(
+            name="Fiduciary Duty of Loyalty",
+            domain=LegalDomain.CORPORATE_LAW,
+            description="Directors and officers must act in the best interests of the corporation and its shareholders, not in their own self-interest.",
+            elements=["duty to corporation", "no self-dealing", "corporate opportunity doctrine"],
+        ),
+        LegalPrinciple(
+            name="Piercing the Corporate Veil",
+            domain=LegalDomain.CORPORATE_LAW,
+            description="Courts may disregard the corporate entity and hold shareholders personally liable when the corporate form is used to perpetrate fraud or injustice.",
+            elements=["alter ego", "undercapitalization", "commingling of assets", "fraud or injustice"],
+        ),
+    ]
+
+    return statutes, precedents, principles
+
+
+# ======================================================================
+# INTELLECTUAL PROPERTY LAW
+# ======================================================================
+
+
+def _get_ip_law() -> tuple[list[Statute], list[Precedent], list[LegalPrinciple]]:
+    statutes = [
+        Statute(
+            name="Patent Act",
+            code="35 U.S.C.",
+            section="Various",
+            domain=LegalDomain.INTELLECTUAL_PROPERTY,
+            jurisdiction=JurisdictionType.FEDERAL,
+            summary="Governs patent applications, examination, and enforcement of patent rights.",
+        ),
+        Statute(
+            name="Copyright Act of 1976",
+            code="17 U.S.C.",
+            section="Various",
+            domain=LegalDomain.INTELLECTUAL_PROPERTY,
+            jurisdiction=JurisdictionType.FEDERAL,
+            summary="Provides protection for original works of authorship including fair use doctrine.",
+        ),
+        Statute(
+            name="Lanham Act (Trademark Act)",
+            code="15 U.S.C.",
+            section="\u00a71051",
+            domain=LegalDomain.INTELLECTUAL_PROPERTY,
+            jurisdiction=JurisdictionType.FEDERAL,
+            summary="Federal statute governing trademarks, service marks, and unfair competition.",
+        ),
+        Statute(
+            name="Defend Trade Secrets Act",
+            code="18 U.S.C.",
+            section="\u00a71836",
+            domain=LegalDomain.INTELLECTUAL_PROPERTY,
+            jurisdiction=JurisdictionType.FEDERAL,
+            summary="Creates a federal civil cause of action for trade secret misappropriation.",
+        ),
+    ]
+
+    precedents = [
+        Precedent(
+            case_name="Alice Corp. v. CLS Bank International",
+            citation="573 U.S. 208",
+            year=2014,
+            domain=LegalDomain.INTELLECTUAL_PROPERTY,
+            jurisdiction=JurisdictionType.FEDERAL,
+            holding="Claims directed to abstract ideas implemented on generic computers are not patent-eligible under 35 U.S.C. 101.",
+            ratio_decidendi="A two-step framework determines patent eligibility: (1) is the claim directed to an abstract idea? (2) does it contain an inventive concept?",
+            relevance_keywords=["patent", "abstract", "idea", "eligible", "software", "computer", "inventive"],
+            authority_weight=0.90,
+        ),
+        Precedent(
+            case_name="Campbell v. Acuff-Rose Music",
+            citation="510 U.S. 569",
+            year=1994,
+            domain=LegalDomain.INTELLECTUAL_PROPERTY,
+            jurisdiction=JurisdictionType.FEDERAL,
+            holding="A commercial parody can qualify as fair use under the Copyright Act.",
+            ratio_decidendi="Fair use analysis requires consideration of all four statutory factors; transformative use weighs in favor of fair use.",
+            relevance_keywords=["copyright", "fair", "use", "parody", "transformative", "infringement"],
+            authority_weight=0.85,
+        ),
+        Precedent(
+            case_name="eBay Inc. v. MercExchange",
+            citation="547 U.S. 388",
+            year=2006,
+            domain=LegalDomain.INTELLECTUAL_PROPERTY,
+            jurisdiction=JurisdictionType.FEDERAL,
+            holding="The traditional four-factor test for injunctive relief applies in patent cases; injunctions are not automatic upon finding infringement.",
+            ratio_decidendi="Patent holders are not entitled to automatic injunctions; courts must apply the standard equitable test.",
+            relevance_keywords=["patent", "injunction", "infringement", "equitable", "remedy", "irreparable", "harm"],
+            authority_weight=0.85,
+        ),
+    ]
+
+    principles = [
+        LegalPrinciple(
+            name="Fair Use Doctrine",
+            domain=LegalDomain.INTELLECTUAL_PROPERTY,
+            description="Permits limited use of copyrighted material without permission for purposes such as criticism, commentary, news reporting, teaching, and research.",
+            elements=[
+                "purpose and character of use (commercial vs. educational)",
+                "nature of the copyrighted work",
+                "amount and substantiality of portion used",
+                "effect on the market for the original work",
+            ],
+        ),
+        LegalPrinciple(
+            name="Trade Secret Protection",
+            domain=LegalDomain.INTELLECTUAL_PROPERTY,
+            description="Information that derives economic value from not being generally known and is subject to reasonable secrecy efforts is protectable as a trade secret.",
+            elements=["economic value from secrecy", "not generally known", "reasonable efforts to maintain secrecy"],
+            exceptions=["reverse engineering", "independent development", "public disclosure"],
+        ),
+        LegalPrinciple(
+            name="First Sale Doctrine",
+            domain=LegalDomain.INTELLECTUAL_PROPERTY,
+            description="Once a copyrighted work or patented item is lawfully sold, the rights holder cannot control subsequent resales.",
+            elements=["authorized first sale", "lawful acquisition", "physical or digital copy"],
+        ),
+    ]
+
+    return statutes, precedents, principles
+
+
+# ======================================================================
+# FAMILY LAW
+# ======================================================================
+
+
+def _get_family_law() -> tuple[list[Statute], list[Precedent], list[LegalPrinciple]]:
+    statutes = [
+        Statute(
+            name="Uniform Child Custody Jurisdiction and Enforcement Act",
+            code="UCCJEA",
+            section="Various",
+            domain=LegalDomain.FAMILY_LAW,
+            summary="Determines which state has jurisdiction over child custody disputes.",
+        ),
+        Statute(
+            name="Uniform Marriage and Divorce Act",
+            code="UMDA",
+            section="Various",
+            domain=LegalDomain.FAMILY_LAW,
+            summary="Model act governing marriage formation, divorce grounds, property division, and spousal support.",
+        ),
+    ]
+
+    precedents = [
+        Precedent(
+            case_name="Troxel v. Granville",
+            citation="530 U.S. 57",
+            year=2000,
+            domain=LegalDomain.FAMILY_LAW,
+            jurisdiction=JurisdictionType.FEDERAL,
+            holding="Parents have a fundamental right to make decisions concerning the care, custody, and control of their children.",
+            ratio_decidendi="Due process protects the fundamental right of parents to direct the upbringing of their children.",
+            relevance_keywords=["parental", "rights", "custody", "children", "visitation", "fundamental", "care"],
+            authority_weight=0.85,
+        ),
+    ]
+
+    principles = [
+        LegalPrinciple(
+            name="Best Interest of the Child",
+            domain=LegalDomain.FAMILY_LAW,
+            description="In custody and child welfare proceedings, the primary consideration is the best interest and welfare of the child.",
+            elements=[
+                "child's wishes (if of sufficient age)",
+                "emotional ties with each parent",
+                "stability of home environment",
+                "mental and physical health of parties",
+            ],
+        ),
+        LegalPrinciple(
+            name="Equitable Distribution",
+            domain=LegalDomain.FAMILY_LAW,
+            description="Marital property is divided equitably (though not necessarily equally) upon divorce based on various factors.",
+            elements=["length of marriage", "contributions of each spouse", "economic circumstances", "future earning capacity"],
+        ),
+    ]
+
+    return statutes, precedents, principles
+
+
+# ======================================================================
+# EVIDENCE LAW
+# ======================================================================
+
+
+def _get_evidence_law() -> tuple[list[Statute], list[Precedent], list[LegalPrinciple]]:
+    statutes = [
+        Statute(
+            name="Federal Rules of Evidence",
+            code="FRE",
+            section="Various",
+            domain=LegalDomain.EVIDENCE_LAW,
+            jurisdiction=JurisdictionType.FEDERAL,
+            summary="Governs the admissibility and presentation of evidence in federal court proceedings.",
+        ),
+    ]
+
+    precedents = [
+        Precedent(
+            case_name="Daubert v. Merrell Dow Pharmaceuticals",
+            citation="509 U.S. 579",
+            year=1993,
+            domain=LegalDomain.EVIDENCE_LAW,
+            jurisdiction=JurisdictionType.FEDERAL,
+            holding="Trial judges serve as gatekeepers for expert testimony, which must be based on reliable scientific methodology.",
+            ratio_decidendi="Expert testimony must be both relevant and reliable under FRE 702.",
+            relevance_keywords=["expert", "testimony", "scientific", "reliable", "evidence", "admissibility", "methodology"],
+            authority_weight=0.90,
+        ),
+    ]
+
+    principles = [
+        LegalPrinciple(
+            name="Hearsay Rule",
+            domain=LegalDomain.EVIDENCE_LAW,
+            description="Out-of-court statements offered to prove the truth of the matter asserted are generally inadmissible.",
+            elements=["out-of-court statement", "offered for truth", "declarant not present"],
+            exceptions=["present sense impression", "excited utterance", "business records", "dying declaration", "statement against interest"],
+        ),
+        LegalPrinciple(
+            name="Relevance and Prejudice Balancing",
+            domain=LegalDomain.EVIDENCE_LAW,
+            description="Relevant evidence may be excluded if its probative value is substantially outweighed by the danger of unfair prejudice.",
+            elements=["probative value", "unfair prejudice", "confusion of issues", "misleading the jury"],
+        ),
+    ]
+
+    return statutes, precedents, principles
+
+
+# ======================================================================
 # Aggregation helpers
 # ======================================================================
 
@@ -511,6 +814,10 @@ def _all_domains() -> list[tuple[list[Statute], list[Precedent], list[LegalPrinc
         _get_constitutional_law(),
         _get_property_law(),
         _get_employment_law(),
+        _get_corporate_law(),
+        _get_ip_law(),
+        _get_family_law(),
+        _get_evidence_law(),
     ]
 
 

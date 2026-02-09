@@ -309,3 +309,132 @@ def test_judge_remedy_for_tort():
     # If granted, tort remedy should be damages.
     if judgment.disposition in (Disposition.GRANTED, Disposition.GRANTED_IN_PART):
         assert judgment.remedy == RemedyType.DAMAGES
+
+
+# ------------------------------------------------------------------
+# Dissent
+# ------------------------------------------------------------------
+
+def test_judgment_includes_dissent():
+    kb = KnowledgeBase.with_defaults()
+    engine = kb.create_judge()
+    case = _make_contract_case()
+    judgment = engine.adjudicate(case)
+    # Cases with competing parties should generate a dissent.
+    assert judgment.dissent != ""
+    assert "dissent" in judgment.dissent.lower()
+    # Dissent section should be in the structured sections.
+    headings = [s.heading for s in judgment.sections]
+    assert any("Dissent" in h for h in headings)
+
+
+# ------------------------------------------------------------------
+# Appeal
+# ------------------------------------------------------------------
+
+def test_appeal_produces_new_judgment():
+    kb = KnowledgeBase.with_defaults()
+    engine = kb.create_judge()
+    case = _make_contract_case()
+    original = engine.adjudicate(case)
+    appeal_judgment = engine.appeal(
+        case, original,
+        new_arguments=[
+            Argument(
+                party_name="Beta",
+                claim="New evidence shows force majeure.",
+                supporting_facts=["Unprecedented event"],
+                legal_basis=["Force majeure doctrine"],
+            ),
+        ],
+    )
+    assert appeal_judgment.case_id == "J-001-APPEAL"
+    assert appeal_judgment.disposition in list(Disposition)
+
+
+# ------------------------------------------------------------------
+# Case comparison
+# ------------------------------------------------------------------
+
+def test_compare_similar_cases():
+    engine = JudgeEngine()
+    case_a = Case(
+        case_id="CMP-A",
+        title="A v B",
+        case_type=CaseType.CONTRACT,
+        facts=["Breach of contract for goods."],
+        issues=["Whether breach occurred"],
+    )
+    case_b = Case(
+        case_id="CMP-B",
+        title="C v D",
+        case_type=CaseType.CONTRACT,
+        facts=["Breach of contract for services."],
+        issues=["Whether breach occurred"],
+    )
+    result = engine.compare_cases(case_a, case_b)
+    assert "overall_similarity" in result
+    assert result["overall_similarity"] > 0
+    assert result["case_type_match"] is True
+
+
+def test_compare_different_cases():
+    engine = JudgeEngine()
+    case_a = Case(
+        case_id="CMP-X",
+        title="X v Y",
+        case_type=CaseType.CONTRACT,
+        facts=["Contract breach."],
+    )
+    case_b = Case(
+        case_id="CMP-Y",
+        title="State v Z",
+        case_type=CaseType.CRIMINAL,
+        facts=["Murder charge."],
+    )
+    result = engine.compare_cases(case_a, case_b)
+    assert result["case_type_match"] is False
+
+
+# ------------------------------------------------------------------
+# Case history
+# ------------------------------------------------------------------
+
+def test_case_history_tracking():
+    kb = KnowledgeBase.with_defaults()
+    engine = kb.create_judge()
+    assert len(engine.case_history) == 0
+    case = _make_contract_case()
+    engine.adjudicate(case)
+    assert len(engine.case_history) == 1
+    assert engine.case_history[0][0].case_id == "J-001"
+
+
+def test_find_similar_in_history():
+    kb = KnowledgeBase.with_defaults()
+    engine = kb.create_judge()
+    # Adjudicate two contract cases.
+    case1 = Case(
+        case_id="H-001", title="A v B", case_type=CaseType.CONTRACT,
+        facts=["Contract breach for goods."],
+        issues=["Whether breach occurred"],
+        arguments=[Argument(party_name="A", claim="B breached.")],
+    )
+    case2 = Case(
+        case_id="H-002", title="C v D", case_type=CaseType.CONTRACT,
+        facts=["Contract breach for services."],
+        issues=["Whether breach occurred"],
+        arguments=[Argument(party_name="C", claim="D breached.")],
+    )
+    engine.adjudicate(case1)
+    engine.adjudicate(case2)
+
+    # Search for similar cases.
+    query = Case(
+        case_id="QUERY", title="E v F", case_type=CaseType.CONTRACT,
+        facts=["Contract breach."],
+        issues=["Whether breach occurred"],
+    )
+    similar = engine.find_similar_in_history(query)
+    assert len(similar) == 2
+    assert similar[0]["overall_similarity"] > 0

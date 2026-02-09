@@ -1,0 +1,346 @@
+"""FastAPI application serving the Legal Judge Bot API.
+
+Vercel-compatible: this module is auto-discovered as a serverless function
+at the /api route prefix.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+# Ensure the project root is importable when running under Vercel.
+_project_root = str(Path(__file__).resolve().parent.parent)
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+
+from legal_judge.knowledge.base import KnowledgeBase
+from legal_judge.models.case import (
+    Argument,
+    Case,
+    CaseType,
+    Evidence,
+    EvidenceType,
+    Party,
+    PartyRole,
+)
+from legal_judge.models.judgment import Judgment
+from legal_judge.output.formatter import Formatter
+from legal_judge.main import DEMO_CASES
+
+# ---------------------------------------------------------------------------
+# App + singleton engine
+# ---------------------------------------------------------------------------
+
+app = FastAPI(
+    title="Legal Judge Bot",
+    version="2.0.0",
+    description=(
+        "AI-powered legal analysis engine that applies IRAC reasoning, "
+        "matches precedents, and renders structured judicial opinions. "
+        "Inspired by DeepJudge / Claude Cowork integration concepts."
+    ),
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+_kb = KnowledgeBase.with_defaults()
+_engine = _kb.create_judge()
+
+
+# ---------------------------------------------------------------------------
+# Request / Response schemas
+# ---------------------------------------------------------------------------
+
+class PartyIn(BaseModel):
+    name: str
+    role: str
+    description: str = ""
+    counsel: str = ""
+
+class EvidenceIn(BaseModel):
+    title: str
+    evidence_type: str = "documentary"
+    description: str = ""
+    submitted_by: str = ""
+    credibility_weight: float = Field(default=0.5, ge=0.0, le=1.0)
+    admissible: bool = True
+
+class ArgumentIn(BaseModel):
+    party_name: str
+    claim: str
+    supporting_facts: list[str] = Field(default_factory=list)
+    legal_basis: list[str] = Field(default_factory=list)
+    cited_precedents: list[str] = Field(default_factory=list)
+
+class CaseIn(BaseModel):
+    case_id: str = "WEB-001"
+    title: str
+    case_type: str = "civil"
+    jurisdiction: str = "General"
+    summary: str = ""
+    parties: list[PartyIn] = Field(default_factory=list)
+    facts: list[str] = Field(default_factory=list)
+    issues: list[str] = Field(default_factory=list)
+    arguments: list[ArgumentIn] = Field(default_factory=list)
+    evidence: list[EvidenceIn] = Field(default_factory=list)
+    applicable_statutes: list[str] = Field(default_factory=list)
+
+class AppealIn(BaseModel):
+    original_case: CaseIn
+    new_arguments: list[ArgumentIn] = Field(default_factory=list)
+    new_evidence: list[EvidenceIn] = Field(default_factory=list)
+
+class CompareIn(BaseModel):
+    case_a: CaseIn
+    case_b: CaseIn
+
+class PrecedentSearchIn(BaseModel):
+    query: str
+    domain: str = ""
+    top_k: int = 10
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _to_case(data: CaseIn) -> Case:
+    """Convert an API CaseIn to the domain Case model."""
+    parties = [
+        Party(
+            name=p.name,
+            role=PartyRole(p.role),
+            description=p.description,
+            counsel=p.counsel,
+        )
+        for p in data.parties
+    ]
+    evidence = [
+        Evidence(
+            title=e.title,
+            evidence_type=EvidenceType(e.evidence_type),
+            description=e.description,
+            submitted_by=e.submitted_by,
+            credibility_weight=e.credibility_weight,
+            admissible=e.admissible,
+        )
+        for e in data.evidence
+    ]
+    arguments = [
+        Argument(
+            party_name=a.party_name,
+            claim=a.claim,
+            supporting_facts=a.supporting_facts,
+            legal_basis=a.legal_basis,
+            cited_precedents=a.cited_precedents,
+        )
+        for a in data.arguments
+    ]
+    return Case(
+        case_id=data.case_id,
+        title=data.title,
+        case_type=CaseType(data.case_type),
+        jurisdiction=data.jurisdiction,
+        summary=data.summary,
+        parties=parties,
+        facts=data.facts,
+        issues=data.issues,
+        arguments=arguments,
+        evidence=evidence,
+        applicable_statutes=data.applicable_statutes,
+    )
+
+
+def _judgment_to_dict(j: Judgment) -> dict:
+    """Serialize a Judgment to a JSON-friendly dict."""
+    return {
+        "case_id": j.case_id,
+        "case_title": j.case_title,
+        "date_decided": str(j.date_decided),
+        "disposition": j.disposition.value,
+        "remedy": j.remedy.value,
+        "summary": j.summary,
+        "facts_found": j.facts_found,
+        "issues_addressed": j.issues_addressed,
+        "rules_applied": j.rules_applied,
+        "analysis": j.analysis,
+        "holding": j.holding,
+        "reasoning": j.reasoning,
+        "remedy_details": j.remedy_details,
+        "dissent": j.dissent,
+        "confidence": round(j.confidence, 4),
+        "strength_of_evidence": round(j.strength_of_evidence, 4),
+        "prevailing_party": j.prevailing_party,
+        "costs_awarded_to": j.costs_awarded_to,
+        "sections": [
+            {"heading": s.heading, "content": s.content}
+            for s in j.sections
+        ],
+        "opinion_text": Formatter.to_text(j),
+        "opinion_markdown": Formatter.to_markdown(j),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
+@app.get("/api/health")
+def health():
+    return {"status": "ok", "version": "2.0.0"}
+
+
+@app.get("/api/knowledge")
+def knowledge_info():
+    return {
+        "statutes": len(_kb.statutes),
+        "precedents": len(_kb.precedents),
+        "principles": len(_kb.principles),
+        "domains": sorted({s.domain.value for s in _kb.statutes} | {p.domain.value for p in _kb.precedents}),
+        "statutes_list": [
+            {"name": s.name, "code": s.code, "domain": s.domain.value, "summary": s.summary}
+            for s in _kb.statutes
+        ],
+        "precedents_list": [
+            {
+                "case_name": p.case_name,
+                "citation": p.citation,
+                "year": p.year,
+                "domain": p.domain.value,
+                "holding": p.holding,
+                "authority_weight": p.authority_weight,
+            }
+            for p in _kb.precedents
+        ],
+        "principles_list": [
+            {
+                "name": p.name,
+                "latin_name": p.latin_name,
+                "domain": p.domain.value,
+                "description": p.description,
+                "elements": p.elements,
+            }
+            for p in _kb.principles
+        ],
+    }
+
+
+@app.post("/api/precedents/search")
+def search_precedents(body: PrecedentSearchIn):
+    query_lower = body.query.lower()
+    query_words = {w.strip(".,;:!?") for w in query_lower.split() if len(w) > 2}
+    results = []
+    for p in _kb.precedents:
+        if body.domain and p.domain.value != body.domain:
+            continue
+        kw_set = {k.lower() for k in p.relevance_keywords}
+        text_words = {w.lower().strip(".,;:!?") for w in (p.holding + " " + p.case_name).split() if len(w) > 2}
+        overlap = query_words & (kw_set | text_words)
+        if overlap:
+            results.append({
+                "case_name": p.case_name,
+                "citation": p.citation,
+                "year": p.year,
+                "domain": p.domain.value,
+                "holding": p.holding,
+                "ratio_decidendi": p.ratio_decidendi,
+                "authority_weight": p.authority_weight,
+                "matched_terms": sorted(overlap),
+            })
+    results.sort(key=lambda r: len(r["matched_terms"]), reverse=True)
+    return {"results": results[:body.top_k]}
+
+
+@app.get("/api/demo/{case_name}")
+def get_demo(case_name: str):
+    builder = DEMO_CASES.get(case_name)
+    if not builder:
+        raise HTTPException(status_code=404, detail=f"Demo case '{case_name}' not found. Available: {list(DEMO_CASES.keys())}")
+    case = builder()
+    return case.model_dump(mode="json")
+
+
+@app.post("/api/judge")
+def judge_case(body: CaseIn):
+    case = _to_case(body)
+    judgment = _engine.adjudicate(case)
+    return _judgment_to_dict(judgment)
+
+
+@app.post("/api/appeal")
+def appeal_case(body: AppealIn):
+    original_case = _to_case(body.original_case)
+    original_judgment = _engine.adjudicate(original_case)
+
+    new_args = [
+        Argument(
+            party_name=a.party_name,
+            claim=a.claim,
+            supporting_facts=a.supporting_facts,
+            legal_basis=a.legal_basis,
+            cited_precedents=a.cited_precedents,
+        )
+        for a in body.new_arguments
+    ]
+    new_ev = [
+        Evidence(
+            title=e.title,
+            evidence_type=EvidenceType(e.evidence_type),
+            description=e.description,
+            submitted_by=e.submitted_by,
+            credibility_weight=e.credibility_weight,
+            admissible=e.admissible,
+        )
+        for e in body.new_evidence
+    ]
+
+    appeal_judgment = _engine.appeal(original_case, original_judgment, new_args, new_ev)
+    return {
+        "original": _judgment_to_dict(original_judgment),
+        "appeal": _judgment_to_dict(appeal_judgment),
+    }
+
+
+@app.post("/api/compare")
+def compare_cases(body: CompareIn):
+    case_a = _to_case(body.case_a)
+    case_b = _to_case(body.case_b)
+    return _engine.compare_cases(case_a, case_b)
+
+
+@app.get("/api/history")
+def case_history():
+    return {
+        "count": len(_engine.case_history),
+        "cases": [
+            {
+                "case_id": c.case_id,
+                "title": c.title,
+                "disposition": j.disposition.value,
+                "confidence": round(j.confidence, 4),
+                "prevailing_party": j.prevailing_party,
+            }
+            for c, j in _engine.case_history
+        ],
+    }
+
+
+@app.get("/api/enums")
+def get_enums():
+    """Return all enum values for building dynamic forms."""
+    return {
+        "case_types": [t.value for t in CaseType],
+        "party_roles": [r.value for r in PartyRole],
+        "evidence_types": [t.value for t in EvidenceType],
+    }
