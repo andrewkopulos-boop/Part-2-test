@@ -119,7 +119,14 @@
                 <button type="button" class="btn btn-primary btn-lg" onclick="submitCase()">
                   <span class="btn-icon">&#9878;</span> Render Judgment
                 </button>
+                <button type="button" class="btn btn-gold-outline btn-lg" onclick="submitPanel()">
+                  <span class="btn-icon">&#9881;</span> 3-Judge Panel
+                </button>
                 <button type="button" class="btn btn-outline btn-lg" onclick="clearForm()">Clear</button>
+              </div>
+              <div class="form-actions-secondary">
+                <button type="button" class="btn btn-sm btn-outline" onclick="runRiskAssessment()">Risk Assessment</button>
+                <button type="button" class="btn btn-sm btn-outline" onclick="runSettlement()">Settlement Calculator</button>
               </div>
             </form>
           </div>
@@ -184,6 +191,21 @@
               <div id="view-json" style="display:none;">
                 <pre class="opinion-json" id="opinion-json-content"></pre>
               </div>
+
+              <!-- Panel view -->
+              <div id="view-panel" style="display:none;">
+                <div id="panel-result"></div>
+              </div>
+
+              <!-- Risk view -->
+              <div id="view-risk" style="display:none;">
+                <div id="risk-result"></div>
+              </div>
+
+              <!-- Settlement view -->
+              <div id="view-settlement" style="display:none;">
+                <div id="settlement-result"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -225,7 +247,7 @@
     </main>
 
     <footer class="footer">
-      <p>Legal Judge Bot v2.0 &mdash; AI-powered judicial analysis engine. For educational and research purposes only. Not legal advice.</p>
+      <p>Legal Judge Bot v3.0 &mdash; AI-powered judicial analysis engine with multi-judge panel, risk assessment &amp; settlement calculator. For educational and research purposes only. Not legal advice.</p>
     </footer>
   </div>
 

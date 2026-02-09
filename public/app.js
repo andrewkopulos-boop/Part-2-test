@@ -580,3 +580,297 @@ async function loadHistory() {
     });
   } catch { /* ignore */ }
 }
+
+// ------------------------------------------------------------------
+// View management helpers
+// ------------------------------------------------------------------
+function showView(viewId) {
+  ['view-visual','view-text','view-json','view-panel','view-risk','view-settlement'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
+  document.getElementById(viewId).style.display = '';
+  document.getElementById('judgment-empty').style.display = 'none';
+  document.getElementById('judgment-loading').style.display = 'none';
+  document.getElementById('judgment-result').style.display = '';
+  document.getElementById('format-toggle').style.display = 'none';
+}
+
+function showLoading(msg) {
+  document.getElementById('judgment-empty').style.display = 'none';
+  document.getElementById('judgment-result').style.display = 'none';
+  document.getElementById('judgment-loading').style.display = '';
+  document.querySelector('.loading-text').textContent = msg || 'Analyzing case...';
+}
+
+// ------------------------------------------------------------------
+// 3-Judge Panel
+// ------------------------------------------------------------------
+async function submitPanel() {
+  const caseData = collectCase();
+  if (!caseData.title) { alert('Please enter a case title.'); return; }
+  showLoading('Convening 3-judge panel...');
+
+  try {
+    const resp = await fetch(API + '/panel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(caseData),
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    const result = await resp.json();
+    renderPanel(result);
+  } catch (err) {
+    document.getElementById('judgment-loading').style.display = 'none';
+    document.getElementById('judgment-empty').style.display = '';
+    alert('Panel error: ' + err.message);
+  }
+}
+
+function renderPanel(result) {
+  showView('view-panel');
+  const el = document.getElementById('panel-result');
+
+  const unanimous = result.is_unanimous;
+  const bannerClass = unanimous ? 'unanimous' : 'split';
+
+  let html = `
+    <div class="panel-vote-banner ${bannerClass}">
+      <div class="panel-vote-label">${unanimous ? 'UNANIMOUS' : 'SPLIT'} DECISION</div>
+      <div class="panel-vote-disp">${result.majority_disposition.replace(/_/g, ' ').toUpperCase()}</div>
+      <div class="panel-vote-count">${result.majority_vote} of ${result.panel_size} judges</div>
+      <div style="font-size:0.85rem;margin-top:0.5rem;color:var(--text-muted);">
+        Confidence: ${(result.majority_confidence * 100).toFixed(0)}%
+      </div>
+    </div>
+    <div style="padding:1rem 0;">
+      <h3 style="color:var(--gold);margin-bottom:0.5rem;">Majority Opinion</h3>
+      <p style="color:var(--text-secondary);line-height:1.6;">${escapeHtml(result.majority_opinion)}</p>
+    </div>
+    <div class="judge-cards">
+  `;
+
+  (result.opinions || []).forEach(op => {
+    const isMajority = op.in_majority;
+    const cardClass = isMajority ? 'majority' : 'dissent';
+    html += `
+      <div class="judge-card ${cardClass}">
+        <div class="judge-name">${escapeHtml(op.judge_name)}</div>
+        <div class="judge-philosophy">${escapeHtml(op.philosophy)}</div>
+        <div class="judge-disposition" style="color:${dispositionColor(op.disposition)}">${op.disposition.replace(/_/g, ' ')}</div>
+        <div class="judge-conf">Confidence: ${(op.confidence * 100).toFixed(0)}%</div>
+        <div class="judge-role">${isMajority ? 'MAJORITY' : 'DISSENT'}</div>
+        <div class="judge-reasoning">${escapeHtml(op.reasoning)}</div>
+      </div>
+    `;
+  });
+
+  html += '</div>';
+
+  if (result.judgment) {
+    lastJudgment = result.judgment;
+    html += `
+      <div style="text-align:center;margin-top:1.5rem;">
+        <button class="btn btn-sm btn-outline" onclick="renderJudgment(lastJudgment);document.getElementById('format-toggle').style.display='';showView('view-visual');">
+          View Full Majority Opinion
+        </button>
+      </div>
+    `;
+  }
+
+  el.innerHTML = html;
+}
+
+// ------------------------------------------------------------------
+// Risk Assessment
+// ------------------------------------------------------------------
+async function runRiskAssessment() {
+  const caseData = collectCase();
+  if (!caseData.title) { alert('Please enter a case title.'); return; }
+  showLoading('Assessing litigation risk...');
+
+  try {
+    const resp = await fetch(API + '/risk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ case: caseData }),
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    const result = await resp.json();
+    renderRisk(result);
+  } catch (err) {
+    document.getElementById('judgment-loading').style.display = 'none';
+    document.getElementById('judgment-empty').style.display = '';
+    alert('Risk error: ' + err.message);
+  }
+}
+
+function renderRisk(result) {
+  showView('view-risk');
+  const el = document.getElementById('risk-result');
+
+  const riskColor = {
+    low: 'var(--green)', moderate: 'var(--amber)', high: 'var(--red)', very_low: 'var(--green)', extreme: 'var(--red)',
+  }[result.litigation_risk_level] || 'var(--text-muted)';
+
+  let html = `
+    <div class="risk-header">
+      <div>
+        <div class="risk-level" style="color:${riskColor}">${result.litigation_risk_level.replace(/_/g, ' ').toUpperCase()} RISK</div>
+        <div class="risk-title">${escapeHtml(result.case_title)}</div>
+      </div>
+    </div>
+    <div style="padding:0.75rem 0;color:var(--text-secondary);line-height:1.6;font-size:0.9rem;">
+      ${escapeHtml(result.recommendation)}
+    </div>
+    <div class="party-risk-cards">
+  `;
+
+  (result.parties || []).forEach(p => {
+    const probPct = (p.win_probability * 100).toFixed(0);
+    const gradeColorMap = { A: '#22c55e', B: '#84cc16', C: '#eab308', D: '#f97316', F: '#ef4444' };
+    const gc = gradeColorMap[p.overall_grade] || '#888';
+
+    html += `
+      <div class="party-risk-card slide-in">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+          <div>
+            <div class="party-risk-name">${escapeHtml(p.party_name)}</div>
+            <div class="party-risk-role">${p.role}</div>
+          </div>
+          <div class="grade-badge" style="background:${gc}">${p.overall_grade}</div>
+        </div>
+        <div style="margin-bottom:0.5rem;">
+          <div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:0.25rem;">
+            <span>Win Probability</span><span style="color:var(--gold)">${probPct}%</span>
+          </div>
+          <div class="prob-bar"><div class="prob-bar-fill" style="width:${probPct}%"></div></div>
+        </div>
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;">
+          <div style="flex:1;">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.25rem;">Evidence</div>
+            <div class="prob-bar"><div class="prob-bar-fill" style="width:${(p.evidence_score * 100).toFixed(0)}%;background:var(--blue)"></div></div>
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.25rem;">Arguments</div>
+            <div class="prob-bar"><div class="prob-bar-fill" style="width:${(p.argument_score * 100).toFixed(0)}%;background:var(--purple, #a855f7)"></div></div>
+          </div>
+        </div>
+    `;
+
+    if (p.strengths.length) {
+      html += '<div class="sw-list strengths"><div class="sw-label">Strengths</div>';
+      p.strengths.forEach(s => { html += `<div class="sw-item">+ ${escapeHtml(s)}</div>`; });
+      html += '</div>';
+    }
+    if (p.weaknesses.length) {
+      html += '<div class="sw-list weaknesses"><div class="sw-label">Weaknesses</div>';
+      p.weaknesses.forEach(w => { html += `<div class="sw-item">- ${escapeHtml(w)}</div>`; });
+      html += '</div>';
+    }
+    if (p.risk_factors.length) {
+      html += '<div class="sw-list risks"><div class="sw-label">Risk Factors</div>';
+      p.risk_factors.forEach(r => { html += `<div class="sw-item">! ${escapeHtml(r)}</div>`; });
+      html += '</div>';
+    }
+
+    html += '</div>';
+  });
+
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+// ------------------------------------------------------------------
+// Settlement Calculator
+// ------------------------------------------------------------------
+async function runSettlement() {
+  const caseData = collectCase();
+  if (!caseData.title) { alert('Please enter a case title.'); return; }
+
+  const claimedStr = prompt('Enter claimed damages amount (USD). Leave blank for auto-estimate:', '');
+  const claimed = parseFloat(claimedStr) || 0;
+
+  showLoading('Calculating settlement...');
+
+  try {
+    const resp = await fetch(API + '/settlement', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ case: caseData, claimed_damages: claimed }),
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    const result = await resp.json();
+    renderSettlement(result);
+  } catch (err) {
+    document.getElementById('judgment-loading').style.display = 'none';
+    document.getElementById('judgment-empty').style.display = '';
+    alert('Settlement error: ' + err.message);
+  }
+}
+
+function fmtMoney(n) {
+  if (n >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return '$' + (n / 1e3).toFixed(1) + 'K';
+  return '$' + n.toFixed(0);
+}
+
+function renderSettlement(result) {
+  showView('view-settlement');
+  const el = document.getElementById('settlement-result');
+
+  const s = result.settlement_range;
+  const d = result.damages_estimate;
+  const shouldSettle = result.should_settle;
+
+  let html = `
+    <div class="settlement-header" style="text-align:center;padding:1.5rem 0;">
+      <div style="font-size:0.85rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">Settlement Recommendation</div>
+      <div style="font-size:1.8rem;font-weight:700;color:${shouldSettle ? 'var(--green)' : 'var(--red)'};margin:0.5rem 0;">
+        ${shouldSettle ? 'SETTLE' : 'LITIGATE'}
+      </div>
+      <div style="color:var(--text-secondary);font-size:0.9rem;max-width:600px;margin:0 auto;">${escapeHtml(result.settlement_recommendation)}</div>
+    </div>
+
+    <div class="settlement-grid">
+      <div class="settlement-card">
+        <div class="settlement-card-label">Estimated Total Damages</div>
+        <div class="money-big">${fmtMoney(d.total)}</div>
+        <div class="money-row"><span>Compensatory</span><span>${fmtMoney(d.compensatory)}</span></div>
+        <div class="money-row"><span>Consequential</span><span>${fmtMoney(d.consequential)}</span></div>
+        <div class="money-row"><span>Punitive</span><span>${fmtMoney(d.punitive)}</span></div>
+        <div style="margin-top:0.5rem;font-size:0.75rem;color:var(--text-muted);">
+          Confidence: ${(d.confidence * 100).toFixed(0)}% &bull; ${escapeHtml(d.basis)}
+        </div>
+      </div>
+
+      <div class="settlement-card">
+        <div class="settlement-card-label">Settlement Range</div>
+        <div class="money-big" style="color:var(--green)">${fmtMoney(s.recommended)}</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.75rem;">Recommended</div>
+        <div class="settlement-range-bar">
+          <div class="range-fill" style="left:0%;width:100%"></div>
+          ${s.high > 0 ? `<div class="range-marker" style="left:${((s.recommended - s.low) / (s.high - s.low) * 100).toFixed(1)}%"></div>` : ''}
+        </div>
+        <div class="money-row"><span>Low</span><span>${fmtMoney(s.low)}</span></div>
+        <div class="money-row"><span>Midpoint</span><span>${fmtMoney(s.midpoint)}</span></div>
+        <div class="money-row"><span>High</span><span>${fmtMoney(s.high)}</span></div>
+        <div style="margin-top:0.5rem;font-size:0.75rem;color:var(--text-muted);">${escapeHtml(s.rationale)}</div>
+      </div>
+
+      <div class="settlement-card">
+        <div class="settlement-card-label">Litigation Cost Estimate</div>
+        <div class="money-big" style="color:var(--red)">${fmtMoney(result.cost_of_litigation_estimate)}</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.75rem;">Estimated total cost to litigate</div>
+        <div class="settlement-card-label" style="margin-top:1rem;">Risk Summary</div>
+        ${(result.risk_summary.parties || []).map(p => `
+          <div class="money-row">
+            <span>${escapeHtml(p.party_name)} (${p.overall_grade})</span>
+            <span>${(p.win_probability * 100).toFixed(0)}%</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  el.innerHTML = html;
+}

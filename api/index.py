@@ -344,3 +344,120 @@ def get_enums():
         "party_roles": [r.value for r in PartyRole],
         "evidence_types": [t.value for t in EvidenceType],
     }
+
+
+# ---------------------------------------------------------------------------
+# Multi-judge panel
+# ---------------------------------------------------------------------------
+
+@app.post("/api/panel")
+def panel_decision(body: CaseIn):
+    """Submit a case to a 3-judge panel with different judicial philosophies."""
+    from legal_judge.engine.panel import JudicialPanel
+    case = _to_case(body)
+    panel = JudicialPanel(
+        statutes=_kb.statutes,
+        principles=_kb.principles,
+        precedents=_kb.precedents,
+    )
+    decision = panel.decide(case)
+    result = {
+        "case_id": decision.case_id,
+        "case_title": decision.case_title,
+        "panel_size": decision.panel_size,
+        "majority_disposition": decision.majority_disposition.value,
+        "majority_vote": decision.majority_vote,
+        "is_unanimous": decision.is_unanimous,
+        "majority_confidence": decision.majority_confidence,
+        "majority_opinion": decision.majority_opinion,
+        "opinions": decision.opinions,
+    }
+    if decision.judgment:
+        result["judgment"] = _judgment_to_dict(decision.judgment)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Risk assessment
+# ---------------------------------------------------------------------------
+
+class RiskIn(BaseModel):
+    case: CaseIn
+
+@app.post("/api/risk")
+def risk_assessment(body: RiskIn):
+    """Assess litigation risk for each party."""
+    from legal_judge.engine.risk import RiskAssessor
+    case = _to_case(body.case)
+    assessor = RiskAssessor()
+    report = assessor.assess(case)
+    return {
+        "case_id": report.case_id,
+        "case_title": report.case_title,
+        "litigation_risk_level": report.litigation_risk_level,
+        "recommendation": report.recommendation,
+        "parties": [
+            {
+                "party_name": pa.party_name,
+                "role": pa.role,
+                "win_probability": pa.win_probability,
+                "overall_grade": pa.overall_grade,
+                "evidence_score": pa.evidence_score,
+                "argument_score": pa.argument_score,
+                "strengths": pa.strengths,
+                "weaknesses": pa.weaknesses,
+                "risk_factors": pa.risk_factors,
+            }
+            for pa in report.party_assessments
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Settlement calculator
+# ---------------------------------------------------------------------------
+
+class SettlementIn(BaseModel):
+    case: CaseIn
+    claimed_damages: float = 0.0
+
+@app.post("/api/settlement")
+def settlement_analysis(body: SettlementIn):
+    """Calculate settlement recommendation and damages estimate."""
+    from legal_judge.engine.settlement import SettlementCalculator
+    case = _to_case(body.case)
+    calc = SettlementCalculator()
+    report = calc.analyze(case, body.claimed_damages)
+    return {
+        "case_id": report.case_id,
+        "case_title": report.case_title,
+        "should_settle": report.should_settle,
+        "settlement_recommendation": report.settlement_recommendation,
+        "cost_of_litigation_estimate": report.cost_of_litigation_estimate,
+        "damages_estimate": {
+            "compensatory": report.damages_estimate.compensatory,
+            "consequential": report.damages_estimate.consequential,
+            "punitive": report.damages_estimate.punitive,
+            "total": report.damages_estimate.total,
+            "confidence": report.damages_estimate.confidence,
+            "basis": report.damages_estimate.basis,
+        },
+        "settlement_range": {
+            "low": report.settlement_range.low,
+            "midpoint": report.settlement_range.midpoint,
+            "high": report.settlement_range.high,
+            "recommended": report.settlement_range.recommended,
+            "rationale": report.settlement_range.rationale,
+        },
+        "risk_summary": {
+            "litigation_risk_level": report.risk_report.litigation_risk_level,
+            "parties": [
+                {
+                    "party_name": pa.party_name,
+                    "win_probability": pa.win_probability,
+                    "overall_grade": pa.overall_grade,
+                }
+                for pa in report.risk_report.party_assessments
+            ],
+        },
+    }
