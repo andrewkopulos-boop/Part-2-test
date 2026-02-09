@@ -1,0 +1,117 @@
+{
+  "case_id": "CUSTOM-2026-001",
+  "title": "TechStart Inc. v. DataFlow Systems",
+  "case_type": "intellectual_property",
+  "jurisdiction": "Federal",
+  "summary": "Trade secret misappropriation claim involving a former employee.",
+  "parties": [
+    {
+      "name": "TechStart Inc.",
+      "role": "plaintiff",
+      "description": "Software startup that developed a proprietary algorithm",
+      "counsel": "M. Chen, Esq."
+    },
+    {
+      "name": "DataFlow Systems",
+      "role": "defendant",
+      "description": "Competing software company that hired TechStart's former lead engineer",
+      "counsel": "L. Park, Esq."
+    }
+  ],
+  "facts": [
+    "TechStart Inc. developed a proprietary data compression algorithm over 3 years.",
+    "The algorithm was protected under NDA and non-compete agreements.",
+    "Lead engineer Dr. Sarah Kim left TechStart in June 2025.",
+    "Dr. Kim joined DataFlow Systems in July 2025 as VP of Engineering.",
+    "DataFlow released a product with substantially similar compression capabilities in October 2025.",
+    "TechStart's algorithm was stored on secured servers with access logging.",
+    "Access logs show Dr. Kim downloaded algorithm documentation two weeks before resignation.",
+    "Dr. Kim's non-compete clause had a 12-month duration and 50-mile radius."
+  ],
+  "issues": [
+    "Whether DataFlow Systems misappropriated TechStart's trade secrets",
+    "Whether Dr. Kim violated her non-compete agreement",
+    "Whether injunctive relief is appropriate"
+  ],
+  "arguments": [
+    {
+      "party_name": "TechStart Inc.",
+      "claim": "DataFlow misappropriated trade secrets by hiring Dr. Kim and using proprietary algorithm knowledge.",
+      "supporting_facts": [
+        "Dr. Kim had access to the algorithm",
+        "She downloaded documentation before leaving",
+        "DataFlow's product appeared within months of her hiring"
+      ],
+      "legal_basis": [
+        "Defend Trade Secrets Act",
+        "Uniform Trade Secrets Act"
+      ]
+    },
+    {
+      "party_name": "TechStart Inc.",
+      "claim": "Dr. Kim violated her enforceable non-compete agreement.",
+      "supporting_facts": [
+        "Non-compete was signed as condition of employment",
+        "12-month duration is reasonable",
+        "DataFlow is a direct competitor"
+      ],
+      "legal_basis": [
+        "Contract law",
+        "Non-compete enforceability"
+      ]
+    },
+    {
+      "party_name": "DataFlow Systems",
+      "claim": "The compression algorithm uses publicly known techniques and was independently developed.",
+      "supporting_facts": [
+        "Similar algorithms exist in academic literature",
+        "DataFlow had a pre-existing R&D team"
+      ],
+      "legal_basis": [
+        "Independent development defense",
+        "Publicly available information"
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "title": "NDA and Non-Compete Agreement",
+      "evidence_type": "documentary",
+      "description": "Signed agreement between TechStart and Dr. Kim with non-compete and NDA terms.",
+      "submitted_by": "TechStart Inc.",
+      "credibility_weight": 0.9
+    },
+    {
+      "title": "Server Access Logs",
+      "evidence_type": "digital",
+      "description": "Logs showing Dr. Kim accessed and downloaded algorithm files before resignation.",
+      "submitted_by": "TechStart Inc.",
+      "credibility_weight": 0.95
+    },
+    {
+      "title": "Product Comparison Analysis",
+      "evidence_type": "expert_opinion",
+      "description": "Expert report comparing TechStart's algorithm with DataFlow's product, finding 87% similarity.",
+      "submitted_by": "TechStart Inc.",
+      "credibility_weight": 0.8
+    },
+    {
+      "title": "Independent Development Timeline",
+      "evidence_type": "documentary",
+      "description": "DataFlow's internal documents showing prior R&D work on compression.",
+      "submitted_by": "DataFlow Systems",
+      "credibility_weight": 0.5
+    },
+    {
+      "title": "Academic Literature Survey",
+      "evidence_type": "expert_opinion",
+      "description": "Survey of published compression algorithms showing similar public techniques.",
+      "submitted_by": "DataFlow Systems",
+      "credibility_weight": 0.55
+    }
+  ],
+  "applicable_statutes": [
+    "Defend Trade Secrets Act (18 U.S.C. 1836)",
+    "Uniform Trade Secrets Act"
+  ]
+}
