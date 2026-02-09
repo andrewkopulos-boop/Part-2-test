@@ -7,17 +7,33 @@
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
+
+  <!-- TOAST NOTIFICATIONS -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- MODAL SYSTEM -->
+  <div id="modal-overlay" class="modal-overlay" onclick="handleModalOverlayClick(event)">
+    <div class="modal" id="modal-box">
+      <div class="modal-header">
+        <h3 id="modal-title"></h3>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-footer" id="modal-footer" style="display:none;"></div>
+    </div>
+  </div>
+
   <div class="app">
     <!-- HEADER -->
     <header class="header">
       <div class="header-inner">
         <div class="logo">
           <div class="logo-icon">
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-              <rect width="32" height="32" rx="8" fill="#1a1a2e"/>
-              <path d="M16 6L8 10v4l8 4 8-4v-4L16 6z" fill="#c9a84c" opacity="0.9"/>
-              <path d="M8 14v4l8 4 8-4v-4l-8 4-8-4z" fill="#c9a84c" opacity="0.6"/>
-              <path d="M8 18v4l8 4 8-4v-4l-8 4-8-4z" fill="#c9a84c" opacity="0.3"/>
+            <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+              <rect width="36" height="36" rx="10" fill="#1a1a2e"/>
+              <path d="M18 6L9 11v5l9 5 9-5v-5L18 6z" fill="#c9a84c" opacity="0.9"/>
+              <path d="M9 16v5l9 5 9-5v-5l-9 5-9-5z" fill="#c9a84c" opacity="0.6"/>
+              <path d="M9 21v5l9 5 9-5v-5l-9 5-9-5z" fill="#c9a84c" opacity="0.3"/>
             </svg>
           </div>
           <div>
@@ -26,10 +42,19 @@
           </div>
         </div>
         <nav class="nav">
-          <button class="nav-btn active" data-tab="judge">Judge a Case</button>
-          <button class="nav-btn" data-tab="knowledge">Knowledge Base</button>
-          <button class="nav-btn" data-tab="history">Case History</button>
+          <button class="nav-btn active" data-tab="judge">
+            <span class="nav-icon">&#9878;</span> Judge a Case
+          </button>
+          <button class="nav-btn" data-tab="knowledge">
+            <span class="nav-icon">&#128218;</span> Knowledge Base
+          </button>
+          <button class="nav-btn" data-tab="history">
+            <span class="nav-icon">&#128203;</span> Case History
+          </button>
         </nav>
+        <div class="header-hint">
+          <kbd>Ctrl</kbd>+<kbd>Enter</kbd> to submit
+        </div>
       </div>
     </header>
 
@@ -44,77 +69,123 @@
             <div class="panel-header">
               <h2>Case Builder</h2>
               <div class="demo-btns">
-                <button class="btn btn-sm btn-outline" onclick="loadDemo('contract')">Demo: Contract</button>
-                <button class="btn btn-sm btn-outline" onclick="loadDemo('tort')">Demo: Tort</button>
+                <button class="btn btn-sm btn-outline" onclick="loadDemo('contract')">Contract</button>
+                <button class="btn btn-sm btn-outline" onclick="loadDemo('tort')">Tort</button>
+                <button class="btn btn-sm btn-outline" onclick="loadDemo('criminal')">Criminal</button>
               </div>
             </div>
 
             <form id="case-form" onsubmit="return false;">
               <!-- Basic Info -->
-              <fieldset class="fieldset">
-                <legend>Case Information</legend>
-                <div class="form-row">
-                  <div class="form-group flex-2">
-                    <label>Case Title</label>
-                    <input type="text" id="case-title" placeholder="e.g. Smith v. Jones" required>
+              <fieldset class="fieldset collapsible open" data-section="info">
+                <legend onclick="toggleFieldset(this)">
+                  <span class="fieldset-chevron">&#9660;</span>
+                  Case Information
+                </legend>
+                <div class="fieldset-body">
+                  <div class="form-row">
+                    <div class="form-group flex-2">
+                      <label>Case Title <span class="required">*</span></label>
+                      <input type="text" id="case-title" placeholder="e.g. Smith v. Jones" required>
+                    </div>
+                    <div class="form-group flex-1">
+                      <label>Case ID</label>
+                      <input type="text" id="case-id" placeholder="Auto-generated">
+                    </div>
                   </div>
-                  <div class="form-group flex-1">
-                    <label>Case ID</label>
-                    <input type="text" id="case-id" placeholder="e.g. 2026-001" value="">
+                  <div class="form-row">
+                    <div class="form-group flex-1">
+                      <label>Case Type</label>
+                      <select id="case-type"></select>
+                    </div>
+                    <div class="form-group flex-1">
+                      <label>Jurisdiction</label>
+                      <input type="text" id="case-jurisdiction" value="General">
+                    </div>
                   </div>
-                </div>
-                <div class="form-row">
-                  <div class="form-group flex-1">
-                    <label>Case Type</label>
-                    <select id="case-type"></select>
+                  <div class="form-group">
+                    <label>Summary</label>
+                    <textarea id="case-summary" rows="2" placeholder="Brief summary of the dispute..."></textarea>
                   </div>
-                  <div class="form-group flex-1">
-                    <label>Jurisdiction</label>
-                    <input type="text" id="case-jurisdiction" value="General">
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label>Summary</label>
-                  <textarea id="case-summary" rows="2" placeholder="Brief summary of the dispute..."></textarea>
                 </div>
               </fieldset>
 
               <!-- Parties -->
-              <fieldset class="fieldset">
-                <legend>Parties <button type="button" class="btn btn-xs btn-add" onclick="addParty()">+ Add</button></legend>
-                <div id="parties-list"></div>
+              <fieldset class="fieldset collapsible open" data-section="parties">
+                <legend onclick="toggleFieldset(this)">
+                  <span class="fieldset-chevron">&#9660;</span>
+                  Parties
+                  <button type="button" class="btn btn-xs btn-add" onclick="event.stopPropagation();addParty()">+ Add</button>
+                </legend>
+                <div class="fieldset-body">
+                  <div id="parties-list"></div>
+                </div>
               </fieldset>
 
               <!-- Facts -->
-              <fieldset class="fieldset">
-                <legend>Facts <button type="button" class="btn btn-xs btn-add" onclick="addFact()">+ Add</button></legend>
-                <div id="facts-list"></div>
+              <fieldset class="fieldset collapsible open" data-section="facts">
+                <legend onclick="toggleFieldset(this)">
+                  <span class="fieldset-chevron">&#9660;</span>
+                  Facts
+                  <button type="button" class="btn btn-xs btn-add" onclick="event.stopPropagation();addFact()">+ Add</button>
+                </legend>
+                <div class="fieldset-body">
+                  <div id="facts-list"></div>
+                </div>
               </fieldset>
 
               <!-- Issues -->
-              <fieldset class="fieldset">
-                <legend>Legal Issues <button type="button" class="btn btn-xs btn-add" onclick="addIssue()">+ Add</button></legend>
-                <div id="issues-list"></div>
+              <fieldset class="fieldset collapsible open" data-section="issues">
+                <legend onclick="toggleFieldset(this)">
+                  <span class="fieldset-chevron">&#9660;</span>
+                  Legal Issues
+                  <button type="button" class="btn btn-xs btn-add" onclick="event.stopPropagation();addIssue()">+ Add</button>
+                </legend>
+                <div class="fieldset-body">
+                  <div id="issues-list"></div>
+                </div>
               </fieldset>
 
               <!-- Arguments -->
-              <fieldset class="fieldset">
-                <legend>Arguments <button type="button" class="btn btn-xs btn-add" onclick="addArgument()">+ Add</button></legend>
-                <div id="arguments-list"></div>
+              <fieldset class="fieldset collapsible" data-section="arguments">
+                <legend onclick="toggleFieldset(this)">
+                  <span class="fieldset-chevron">&#9654;</span>
+                  Arguments
+                  <span class="fieldset-count" id="arg-count">0</span>
+                  <button type="button" class="btn btn-xs btn-add" onclick="event.stopPropagation();addArgument()">+ Add</button>
+                </legend>
+                <div class="fieldset-body" style="display:none;">
+                  <div id="arguments-list"></div>
+                </div>
               </fieldset>
 
               <!-- Evidence -->
-              <fieldset class="fieldset">
-                <legend>Evidence <button type="button" class="btn btn-xs btn-add" onclick="addEvidence()">+ Add</button></legend>
-                <div id="evidence-list"></div>
+              <fieldset class="fieldset collapsible" data-section="evidence">
+                <legend onclick="toggleFieldset(this)">
+                  <span class="fieldset-chevron">&#9654;</span>
+                  Evidence
+                  <span class="fieldset-count" id="ev-count">0</span>
+                  <button type="button" class="btn btn-xs btn-add" onclick="event.stopPropagation();addEvidence()">+ Add</button>
+                </legend>
+                <div class="fieldset-body" style="display:none;">
+                  <div id="evidence-list"></div>
+                </div>
               </fieldset>
 
               <!-- Applicable Statutes -->
-              <fieldset class="fieldset">
-                <legend>Applicable Statutes <button type="button" class="btn btn-xs btn-add" onclick="addStatute()">+ Add</button></legend>
-                <div id="statutes-list"></div>
+              <fieldset class="fieldset collapsible" data-section="statutes">
+                <legend onclick="toggleFieldset(this)">
+                  <span class="fieldset-chevron">&#9654;</span>
+                  Applicable Statutes
+                  <span class="fieldset-count" id="stat-count">0</span>
+                  <button type="button" class="btn btn-xs btn-add" onclick="event.stopPropagation();addStatute()">+ Add</button>
+                </legend>
+                <div class="fieldset-body" style="display:none;">
+                  <div id="statutes-list"></div>
+                </div>
               </fieldset>
 
+              <!-- ACTION BUTTONS -->
               <div class="form-actions">
                 <button type="button" class="btn btn-primary btn-lg" onclick="submitCase()">
                   <span class="btn-icon">&#9878;</span> Render Judgment
@@ -122,19 +193,33 @@
                 <button type="button" class="btn btn-gold-outline btn-lg" onclick="submitPanel()">
                   <span class="btn-icon">&#9881;</span> 3-Judge Panel
                 </button>
-                <button type="button" class="btn btn-outline btn-lg" onclick="clearForm()">Clear</button>
               </div>
               <div class="form-actions-secondary">
-                <button type="button" class="btn btn-sm btn-outline" onclick="runRiskAssessment()">Risk Assessment</button>
-                <button type="button" class="btn btn-sm btn-outline" onclick="runSettlement()">Settlement Calculator</button>
+                <button type="button" class="btn btn-sm btn-outline" onclick="runRiskAssessment()">
+                  <span class="btn-icon-sm">&#9888;</span> Risk Assessment
+                </button>
+                <button type="button" class="btn btn-sm btn-outline" onclick="openSettlementModal()">
+                  <span class="btn-icon-sm">&#36;</span> Settlement Calculator
+                </button>
+                <button type="button" class="btn btn-sm btn-accent" onclick="runAllAnalyses()">
+                  Run All
+                </button>
+                <span class="flex-spacer"></span>
+                <button type="button" class="btn btn-sm btn-outline" onclick="clearForm()">Clear</button>
               </div>
             </form>
           </div>
 
-          <!-- RIGHT: Judgment display -->
+          <!-- RIGHT: Results panel with tabs -->
           <div class="panel judgment-panel">
             <div class="panel-header">
-              <h2>Judicial Opinion</h2>
+              <h2>Analysis Results</h2>
+              <div class="result-tabs" id="result-tabs" style="display:none;">
+                <button class="result-tab active" data-view="judgment" onclick="switchResultTab(this)">Judgment</button>
+                <button class="result-tab" data-view="panel" onclick="switchResultTab(this)">Panel</button>
+                <button class="result-tab" data-view="risk" onclick="switchResultTab(this)">Risk</button>
+                <button class="result-tab" data-view="settlement" onclick="switchResultTab(this)">Settlement</button>
+              </div>
               <div class="format-toggle" id="format-toggle" style="display:none;">
                 <button class="fmt-btn active" data-fmt="visual">Visual</button>
                 <button class="fmt-btn" data-fmt="text">Text</button>
@@ -152,15 +237,21 @@
                   <path d="M24 44v8l16 8 16-8v-8l-16 8-16-8z" fill="#333" opacity="0.1"/>
                 </svg>
               </div>
-              <p class="empty-title">No judgment rendered yet</p>
-              <p class="empty-sub">Build a case on the left and click "Render Judgment" to begin analysis.</p>
+              <p class="empty-title">No analysis rendered yet</p>
+              <p class="empty-sub">Build a case on the left and click an action button. Try loading a demo case to get started quickly.</p>
+              <div style="margin-top:1.5rem;display:flex;gap:0.5rem;">
+                <button class="btn btn-sm btn-outline" onclick="loadDemo('contract');submitCase();">Quick Demo</button>
+              </div>
             </div>
 
             <!-- Loading -->
             <div id="judgment-loading" class="loading-state" style="display:none;">
-              <div class="gavel-anim">
-                <div class="gavel-head"></div>
-                <div class="gavel-strike"></div>
+              <div class="loading-spinner">
+                <svg viewBox="0 0 60 60" width="60" height="60">
+                  <circle cx="30" cy="30" r="26" fill="none" stroke="var(--border)" stroke-width="4"/>
+                  <circle cx="30" cy="30" r="26" fill="none" stroke="var(--gold)" stroke-width="4"
+                    stroke-dasharray="40 120" stroke-linecap="round" class="spinner-ring"/>
+                </svg>
               </div>
               <p class="loading-text">Analyzing case...</p>
               <p class="loading-sub">Applying IRAC framework &bull; Matching precedents &bull; Weighing evidence</p>
@@ -168,42 +259,39 @@
 
             <!-- Result -->
             <div id="judgment-result" style="display:none;">
-              <!-- Visual view -->
-              <div id="view-visual">
+              <!-- Judgment view -->
+              <div id="view-judgment" class="result-view active">
                 <div class="verdict-banner" id="verdict-banner">
                   <div class="verdict-disposition" id="verdict-disposition"></div>
                   <div class="verdict-meta" id="verdict-meta"></div>
                 </div>
-
                 <div class="score-cards" id="score-cards"></div>
-
                 <div class="opinion-sections" id="opinion-sections"></div>
-
                 <div class="dissent-section" id="dissent-section" style="display:none;"></div>
               </div>
 
-              <!-- Text view -->
-              <div id="view-text" style="display:none;">
+              <!-- Text view (sub-view of judgment) -->
+              <div id="view-text" class="result-view" style="display:none;">
                 <pre class="opinion-text" id="opinion-text-content"></pre>
               </div>
 
-              <!-- JSON view -->
-              <div id="view-json" style="display:none;">
+              <!-- JSON view (sub-view of judgment) -->
+              <div id="view-json" class="result-view" style="display:none;">
                 <pre class="opinion-json" id="opinion-json-content"></pre>
               </div>
 
               <!-- Panel view -->
-              <div id="view-panel" style="display:none;">
+              <div id="view-panel" class="result-view" style="display:none;">
                 <div id="panel-result"></div>
               </div>
 
               <!-- Risk view -->
-              <div id="view-risk" style="display:none;">
+              <div id="view-risk" class="result-view" style="display:none;">
                 <div id="risk-result"></div>
               </div>
 
               <!-- Settlement view -->
-              <div id="view-settlement" style="display:none;">
+              <div id="view-settlement" class="result-view" style="display:none;">
                 <div id="settlement-result"></div>
               </div>
             </div>
@@ -215,22 +303,26 @@
       <section class="tab-panel" id="tab-knowledge">
         <div class="knowledge-grid">
           <div class="kb-stats" id="kb-stats"></div>
+          <div class="kb-domain-filters" id="kb-domain-filters">
+            <button class="domain-filter active" data-domain="all" onclick="filterKBDomain(this)">All Domains</button>
+          </div>
           <div class="kb-section">
             <h3>Precedents</h3>
             <div class="search-bar">
-              <input type="text" id="prec-search" placeholder="Search precedents (e.g. negligence, contract, damages)...">
+              <input type="text" id="prec-search" placeholder="Search precedents (e.g. negligence, contract, damages)..."
+                onkeydown="if(event.key==='Enter')searchPrecedents()">
               <button class="btn btn-sm btn-primary" onclick="searchPrecedents()">Search</button>
             </div>
             <div id="precedents-results"></div>
-            <div id="precedents-list-kb"></div>
+            <div id="precedents-list-kb" class="kb-items-list"></div>
           </div>
           <div class="kb-section">
             <h3>Statutes</h3>
-            <div id="statutes-list-kb"></div>
+            <div id="statutes-list-kb" class="kb-items-list"></div>
           </div>
           <div class="kb-section">
             <h3>Legal Principles</h3>
-            <div id="principles-list-kb"></div>
+            <div id="principles-list-kb" class="kb-items-list"></div>
           </div>
         </div>
       </section>
@@ -239,7 +331,7 @@
       <section class="tab-panel" id="tab-history">
         <div class="history-container">
           <h2>Decided Cases</h2>
-          <p class="history-sub">Cases judged during this session are tracked here.</p>
+          <p class="history-sub">Click any case to view its full judgment.</p>
           <div id="history-list" class="history-list"></div>
         </div>
       </section>
@@ -247,7 +339,7 @@
     </main>
 
     <footer class="footer">
-      <p>Legal Judge Bot v3.0 &mdash; AI-powered judicial analysis engine with multi-judge panel, risk assessment &amp; settlement calculator. For educational and research purposes only. Not legal advice.</p>
+      <p>Legal Judge Bot v4.0 &mdash; AI-powered judicial analysis with IRAC reasoning, multi-judge panels, risk assessment &amp; settlement calculator. For educational and research purposes only.</p>
     </footer>
   </div>
 
