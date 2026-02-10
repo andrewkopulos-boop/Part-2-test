@@ -575,7 +575,8 @@ function renderJudgment(j) {
   document.getElementById('verdict-meta').innerHTML =
     '<strong>' + escapeHtml(j.case_title) + '</strong> &mdash; ' + escapeHtml(j.date_decided) + '<br>' +
     'Prevailing party: <strong>' + escapeHtml(j.prevailing_party) + '</strong>' +
-    (j.remedy !== 'none' ? ' &bull; Remedy: ' + j.remedy.replace(/_/g, ' ') : '');
+    (j.remedy !== 'none' ? ' &bull; Remedy: ' + j.remedy.replace(/_/g, ' ') : '') +
+    '<br><button class="btn-why-result" onclick="openWhyThisResult()">Why this result?</button>';
 
   // Score cards with confidence rings
   var cards = document.getElementById('score-cards');
@@ -682,6 +683,180 @@ function openScoreDetail(idx) {
   }
 
   openModal(title, body);
+}
+
+// ============================================================
+// 17b. "WHY THIS RESULT?" REASONING EXPLAINER
+// ============================================================
+function openWhyThisResult() {
+  if (!lastJudgment) return;
+  var j = lastJudgment;
+
+  var body = '<div class="why-result-container">';
+
+  // Step 1: Overview
+  body += '<div class="why-step">' +
+    '<div class="why-step-number">1</div>' +
+    '<div class="why-step-content">' +
+      '<h4>Disposition: ' + j.disposition.replace(/_/g, ' ').toUpperCase() + '</h4>' +
+      '<p>' + escapeHtml(j.summary) + '</p>' +
+    '</div></div>';
+
+  // Step 2: Issues analyzed
+  body += '<div class="why-step">' +
+    '<div class="why-step-number">2</div>' +
+    '<div class="why-step-content">' +
+      '<h4>Legal Issues Analyzed (' + j.issues_addressed.length + ')</h4>' +
+      '<p>The court identified and analyzed the following legal issues using the IRAC framework (Issue, Rule, Application, Conclusion):</p>' +
+      '<ul>' + j.issues_addressed.map(function(i) { return '<li>' + escapeHtml(i) + '</li>'; }).join('') + '</ul>' +
+    '</div></div>';
+
+  // Step 3: Rules applied
+  body += '<div class="why-step">' +
+    '<div class="why-step-number">3</div>' +
+    '<div class="why-step-content">' +
+      '<h4>Rules &amp; Precedents Applied (' + j.rules_applied.length + ')</h4>' +
+      '<p>The following legal rules, statutes, and precedents guided the analysis:</p>' +
+      '<div class="why-rules-list">' +
+      j.rules_applied.map(function(r) {
+        return '<div class="why-rule-item clickable-rule" onclick="lookupRule(\'' + escapeHtml(r).replace(/'/g, "\\'") + '\')">' +
+          '<span class="why-rule-icon">&#9878;</span> ' + escapeHtml(r) +
+          '<span class="why-lookup-hint">click to look up</span>' +
+        '</div>';
+      }).join('') +
+      '</div>' +
+    '</div></div>';
+
+  // Step 4: Evidence evaluation
+  body += '<div class="why-step">' +
+    '<div class="why-step-number">4</div>' +
+    '<div class="why-step-content">' +
+      '<h4>Evidence Evaluation</h4>' +
+      '<p>The court weighed the evidence and found the following facts:</p>' +
+      '<div class="why-evidence-bar">' +
+        '<div class="why-evidence-label">Evidence Strength</div>' +
+        '<div class="why-bar-track"><div class="why-bar-fill" style="width:' + (j.strength_of_evidence * 100) + '%;background:' + confidenceColor(j.strength_of_evidence) + '"></div></div>' +
+        '<div class="why-evidence-pct" style="color:' + confidenceColor(j.strength_of_evidence) + '">' + (j.strength_of_evidence * 100).toFixed(0) + '%</div>' +
+      '</div>' +
+      (j.facts_found && j.facts_found.length ?
+        '<ul>' + j.facts_found.map(function(f) { return '<li>' + escapeHtml(f) + '</li>'; }).join('') + '</ul>' :
+        '<p style="color:var(--text-muted);">No specific facts enumerated.</p>') +
+    '</div></div>';
+
+  // Step 5: Reasoning chain
+  body += '<div class="why-step">' +
+    '<div class="why-step-number">5</div>' +
+    '<div class="why-step-content">' +
+      '<h4>Reasoning Chain</h4>' +
+      '<p>' + escapeHtml(j.reasoning || j.analysis || 'The court applied the identified rules to the facts and evidence to reach its conclusion.') + '</p>' +
+    '</div></div>';
+
+  // Step 6: Holding
+  body += '<div class="why-step">' +
+    '<div class="why-step-number">6</div>' +
+    '<div class="why-step-content">' +
+      '<h4>Holding</h4>' +
+      '<p><strong style="color:var(--gold);">' + escapeHtml(j.holding || 'The court rendered judgment as stated above.') + '</strong></p>' +
+    '</div></div>';
+
+  // Step 7: Confidence assessment
+  body += '<div class="why-step">' +
+    '<div class="why-step-number">7</div>' +
+    '<div class="why-step-content">' +
+      '<h4>Confidence Assessment: ' + (j.confidence * 100).toFixed(0) + '%</h4>' +
+      '<p>This confidence level reflects:</p>' +
+      '<ul>' +
+        '<li>Strength of applicable precedent (' + j.rules_applied.length + ' rules applied)</li>' +
+        '<li>Quality of evidence presented (' + (j.strength_of_evidence * 100).toFixed(0) + '% strength)</li>' +
+        '<li>Clarity of legal issues (' + j.issues_addressed.length + ' issues identified)</li>' +
+        (j.dissent ? '<li style="color:var(--red);">Note: A dissenting opinion was filed, indicating some judicial disagreement</li>' : '') +
+      '</ul>' +
+    '</div></div>';
+
+  if (j.dissent) {
+    body += '<div class="why-step why-step-dissent">' +
+      '<div class="why-step-number" style="background:var(--red);">!</div>' +
+      '<div class="why-step-content">' +
+        '<h4 style="color:var(--red);">Dissenting View</h4>' +
+        '<p>' + escapeHtml(j.dissent) + '</p>' +
+      '</div></div>';
+  }
+
+  body += '</div>';
+
+  openModal('Why This Result? — Step-by-Step Reasoning', body);
+}
+
+// ============================================================
+// 17c. RULE / PRECEDENT LOOKUP FROM REASONING
+// ============================================================
+function lookupRule(ruleName) {
+  if (!knowledgeData) {
+    showToast('Knowledge base not loaded yet.', 'error');
+    return;
+  }
+  var ruleNameLower = ruleName.toLowerCase();
+
+  // Search precedents
+  var matchedPrec = (knowledgeData.precedents_list || []).find(function(p) {
+    return ruleNameLower.indexOf(p.case_name.toLowerCase()) !== -1 ||
+      p.case_name.toLowerCase().indexOf(ruleNameLower) !== -1;
+  });
+
+  // Search statutes
+  var matchedStat = (knowledgeData.statutes_list || []).find(function(s) {
+    return ruleNameLower.indexOf(s.name.toLowerCase()) !== -1 ||
+      s.name.toLowerCase().indexOf(ruleNameLower) !== -1 ||
+      ruleNameLower.indexOf(s.code.toLowerCase()) !== -1;
+  });
+
+  // Search principles
+  var matchedPrin = (knowledgeData.principles_list || []).find(function(p) {
+    return ruleNameLower.indexOf(p.name.toLowerCase()) !== -1 ||
+      p.name.toLowerCase().indexOf(ruleNameLower) !== -1;
+  });
+
+  var body = '';
+
+  if (matchedPrec) {
+    body += '<div class="lookup-section">' +
+      '<div class="lookup-type-badge">Precedent</div>' +
+      '<h4>' + escapeHtml(matchedPrec.case_name) + '</h4>' +
+      '<div class="lookup-meta">' + escapeHtml(matchedPrec.citation) + ' (' + matchedPrec.year + ') &bull; Authority: ' +
+        (matchedPrec.authority_weight * 100).toFixed(0) + '%</div>' +
+      '<div class="lookup-field"><strong>Holding:</strong> ' + escapeHtml(matchedPrec.holding) + '</div>' +
+      '<div class="lookup-field"><strong>Domain:</strong> ' + matchedPrec.domain.replace(/_/g, ' ') + '</div>' +
+    '</div>';
+  }
+
+  if (matchedStat) {
+    body += '<div class="lookup-section">' +
+      '<div class="lookup-type-badge" style="background:var(--blue);">Statute</div>' +
+      '<h4>' + escapeHtml(matchedStat.name) + '</h4>' +
+      '<div class="lookup-meta">' + escapeHtml(matchedStat.code) + '</div>' +
+      '<div class="lookup-field">' + escapeHtml(matchedStat.summary) + '</div>' +
+      '<div class="lookup-field"><strong>Domain:</strong> ' + matchedStat.domain.replace(/_/g, ' ') + '</div>' +
+    '</div>';
+  }
+
+  if (matchedPrin) {
+    body += '<div class="lookup-section">' +
+      '<div class="lookup-type-badge" style="background:var(--purple);">Principle</div>' +
+      '<h4>' + escapeHtml(matchedPrin.name) + (matchedPrin.latin_name ? ' (' + escapeHtml(matchedPrin.latin_name) + ')' : '') + '</h4>' +
+      '<div class="lookup-field">' + escapeHtml(matchedPrin.description) + '</div>' +
+      (matchedPrin.elements && matchedPrin.elements.length ?
+        '<div class="lookup-field"><strong>Elements:</strong><ul>' +
+        matchedPrin.elements.map(function(e) { return '<li>' + escapeHtml(e) + '</li>'; }).join('') +
+        '</ul></div>' : '') +
+    '</div>';
+  }
+
+  if (!body) {
+    body = '<p style="color:var(--text-muted);padding:1rem;">No matching entry found in the knowledge base for "' + escapeHtml(ruleName) + '".</p>' +
+      '<p style="color:var(--text-secondary);padding:0 1rem;">This rule was applied through general legal reasoning rather than a specific knowledge base entry.</p>';
+  }
+
+  openModal('Legal Reference: ' + ruleName, body);
 }
 
 // ============================================================
@@ -804,11 +979,13 @@ function renderPanel(result) {
       '<div style="font-size:0.85rem;margin-top:0.5rem;color:var(--text-muted);">' +
         'Confidence: ' + (result.majority_confidence * 100).toFixed(0) + '%' +
       '</div>' +
+      '<button class="btn-why-result" onclick="openWhyPanelResult()" style="margin-top:0.75rem;">Why did the panel decide this way?</button>' +
     '</div>' +
     '<div style="padding:1rem 0;">' +
       '<h3 style="color:var(--gold);margin-bottom:0.5rem;">Majority Opinion</h3>' +
       '<p style="color:var(--text-secondary);line-height:1.6;">' + escapeHtml(result.majority_opinion) + '</p>' +
     '</div>' +
+    '<h3 style="color:var(--text-primary);margin-bottom:0.75rem;">Individual Opinions <span style="color:var(--text-muted);font-size:0.8rem;">(click to expand reasoning)</span></h3>' +
     '<div class="judge-cards">';
 
   (result.opinions || []).forEach(function(op, idx) {
@@ -922,6 +1099,7 @@ function renderRisk(result) {
           result.litigation_risk_level.replace(/_/g, ' ').toUpperCase() + ' RISK</div>' +
         '<div class="risk-title">' + escapeHtml(result.case_title) + '</div>' +
       '</div>' +
+      '<button class="btn-why-result" onclick="openWhyRiskResult()" style="margin-top:0.5rem;">Why this risk level?</button>' +
     '</div>' +
     '<div style="padding:0.75rem 0;color:var(--text-secondary);line-height:1.6;font-size:0.9rem;">' +
       escapeHtml(result.recommendation) +
@@ -1064,6 +1242,7 @@ function renderSettlement(result) {
       '<div style="color:var(--text-secondary);font-size:0.9rem;max-width:600px;margin:0 auto;">' +
         escapeHtml(result.settlement_recommendation) +
       '</div>' +
+      '<button class="btn-why-result" onclick="openWhySettlementResult()" style="margin-top:0.75rem;">How was this calculated?</button>' +
     '</div>' +
     '<div class="settlement-grid">' +
       '<div class="settlement-card">' +
@@ -1458,4 +1637,247 @@ function reJudgeFromHistory(caseInfo) {
     document.getElementById('judgment-empty').style.display = '';
     showToast('Error: ' + err.message, 'error');
   });
+}
+
+// ============================================================
+// 26. PANEL REASONING EXPLAINER
+// ============================================================
+function openWhyPanelResult() {
+  if (!lastPanel) return;
+  var p = lastPanel;
+
+  var body = '<div class="why-result-container">';
+
+  body += '<div class="why-step">' +
+    '<div class="why-step-number">1</div>' +
+    '<div class="why-step-content">' +
+      '<h4>Panel Composition</h4>' +
+      '<p>A ' + p.panel_size + '-judge panel was convened, each bringing a different judicial philosophy to the analysis. ' +
+      'This ensures multiple perspectives are considered before reaching a decision.</p>' +
+      '<div class="panel-compare-grid">';
+
+  (p.opinions || []).forEach(function(op) {
+    body += '<div class="panel-compare-card">' +
+      '<div class="panel-compare-name">' + escapeHtml(op.judge_name) + '</div>' +
+      '<div class="panel-compare-phil">' + escapeHtml(op.philosophy) + '</div>' +
+      '<div class="panel-compare-desc">' + escapeHtml(op.philosophy_description || '') + '</div>' +
+    '</div>';
+  });
+  body += '</div></div></div>';
+
+  body += '<div class="why-step">' +
+    '<div class="why-step-number">2</div>' +
+    '<div class="why-step-content">' +
+      '<h4>How Each Judge Weighed the Case</h4>' +
+      '<p>Different judicial philosophies lead judges to weigh evidence, precedent, statutory text, and policy considerations differently:</p>' +
+      '<table class="why-compare-table"><thead><tr>' +
+        '<th>Judge</th><th>Philosophy</th><th>Disposition</th><th>Confidence</th><th>Agrees?</th>' +
+      '</tr></thead><tbody>';
+
+  (p.opinions || []).forEach(function(op) {
+    body += '<tr>' +
+      '<td>' + escapeHtml(op.judge_name) + '</td>' +
+      '<td>' + escapeHtml(op.philosophy) + '</td>' +
+      '<td style="color:' + dispositionColor(op.disposition) + '">' + op.disposition.replace(/_/g, ' ') + '</td>' +
+      '<td>' + (op.confidence * 100).toFixed(0) + '%</td>' +
+      '<td>' + (op.agrees_with_majority ?
+        '<span style="color:var(--green);">Yes</span>' :
+        '<span style="color:var(--red);">No (Dissent)</span>') + '</td>' +
+    '</tr>';
+  });
+  body += '</tbody></table></div></div>';
+
+  // Step 3: Key reasoning differences
+  body += '<div class="why-step">' +
+    '<div class="why-step-number">3</div>' +
+    '<div class="why-step-content">' +
+      '<h4>Individual Reasoning</h4>';
+
+  (p.opinions || []).forEach(function(op) {
+    var borderColor = op.agrees_with_majority ? 'var(--green)' : 'var(--red)';
+    body += '<div class="why-judge-reasoning" style="border-left:3px solid ' + borderColor + ';">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+        '<strong>' + escapeHtml(op.judge_name) + '</strong>' +
+        '<span class="why-judge-tag" style="background:' + (op.agrees_with_majority ? 'var(--green)' : 'var(--red)') + ';">' +
+          (op.agrees_with_majority ? 'MAJORITY' : 'DISSENT') + '</span>' +
+      '</div>' +
+      '<p style="margin:0.5rem 0;">' + escapeHtml(op.reasoning_summary || '') + '</p>' +
+      (op.key_factors && op.key_factors.length ?
+        '<div style="margin-top:0.5rem;"><strong>Key factors this judge considered:</strong><ul>' +
+        op.key_factors.map(function(f) { return '<li>' + escapeHtml(f) + '</li>'; }).join('') +
+        '</ul></div>' : '') +
+      (op.cited_precedents && op.cited_precedents.length ?
+        '<div style="margin-top:0.5rem;"><strong>Cited precedents:</strong> ' +
+        op.cited_precedents.map(function(pr) {
+          return '<span class="clickable-rule" onclick="lookupRule(\'' + escapeHtml(pr).replace(/'/g, "\\'") + '\')" style="cursor:pointer;">' + escapeHtml(pr) + '</span>';
+        }).join(', ') +
+        '</div>' : '') +
+    '</div>';
+  });
+  body += '</div></div>';
+
+  body += '<div class="why-step">' +
+    '<div class="why-step-number">4</div>' +
+    '<div class="why-step-content">' +
+      '<h4>Final Vote: ' + p.majority_vote + '-' + (p.panel_size - p.majority_vote) + '</h4>' +
+      '<p>' + (p.is_unanimous ?
+        'The panel reached a <strong style="color:var(--green);">unanimous</strong> decision, indicating strong consensus across different judicial perspectives.' :
+        'The panel was <strong style="color:var(--amber);">divided</strong>, reflecting genuine disagreement about how the law should be applied in this case. The dissenting judge(s) identified valid concerns that the majority addressed but ultimately did not find persuasive.') +
+      '</p>' +
+    '</div></div>';
+
+  body += '</div>';
+
+  openModal('Panel Decision — Reasoning Explained', body);
+}
+
+// ============================================================
+// 27. RISK ASSESSMENT REASONING EXPLAINER
+// ============================================================
+function openWhyRiskResult() {
+  if (!lastRisk) return;
+  var r = lastRisk;
+
+  var body = '<div class="why-result-container">';
+
+  body += '<div class="why-step">' +
+    '<div class="why-step-number">1</div>' +
+    '<div class="why-step-content">' +
+      '<h4>Risk Level Determination</h4>' +
+      '<p>The litigation risk was assessed as <strong style="color:' +
+        ({low:'var(--green)',moderate:'var(--amber)',high:'var(--red)',very_low:'var(--green)',extreme:'var(--red)'}[r.litigation_risk_level] || 'var(--text-muted)') + ';">' +
+        r.litigation_risk_level.replace(/_/g, ' ').toUpperCase() + '</strong>. This assessment considers:</p>' +
+      '<ul>' +
+        '<li>The relative strength of each party\'s evidence and arguments</li>' +
+        '<li>The clarity and applicability of relevant legal standards</li>' +
+        '<li>The likelihood of prevailing at trial for each party</li>' +
+        '<li>Identified risk factors that could affect the outcome</li>' +
+      '</ul>' +
+    '</div></div>';
+
+  (r.parties || []).forEach(function(party, idx) {
+    var gradeColorMap = { A: '#22c55e', B: '#84cc16', C: '#eab308', D: '#f97316', F: '#ef4444' };
+    var gc = gradeColorMap[party.overall_grade] || '#888';
+
+    body += '<div class="why-step">' +
+      '<div class="why-step-number" style="background:' + gc + ';">' + party.overall_grade + '</div>' +
+      '<div class="why-step-content">' +
+        '<h4>' + escapeHtml(party.party_name) + ' (' + escapeHtml(party.role) + ')</h4>' +
+        '<div class="why-risk-scores">' +
+          '<div class="why-risk-score-item">' +
+            '<span>Win Probability</span>' +
+            '<div class="why-bar-track"><div class="why-bar-fill" style="width:' + (party.win_probability * 100) + '%;background:var(--gold);"></div></div>' +
+            '<span style="color:var(--gold);">' + (party.win_probability * 100).toFixed(0) + '%</span>' +
+          '</div>' +
+          '<div class="why-risk-score-item">' +
+            '<span>Evidence Score</span>' +
+            '<div class="why-bar-track"><div class="why-bar-fill" style="width:' + (party.evidence_score * 100) + '%;background:var(--blue);"></div></div>' +
+            '<span style="color:var(--blue);">' + (party.evidence_score * 100).toFixed(0) + '%</span>' +
+          '</div>' +
+          '<div class="why-risk-score-item">' +
+            '<span>Argument Score</span>' +
+            '<div class="why-bar-track"><div class="why-bar-fill" style="width:' + (party.argument_score * 100) + '%;background:var(--purple);"></div></div>' +
+            '<span style="color:var(--purple);">' + (party.argument_score * 100).toFixed(0) + '%</span>' +
+          '</div>' +
+        '</div>';
+
+    if (party.strengths && party.strengths.length) {
+      body += '<div style="margin-top:0.75rem;"><strong style="color:var(--green);">Strengths:</strong><ul>' +
+        party.strengths.map(function(s) { return '<li style="color:var(--text-secondary);">' + escapeHtml(s) + '</li>'; }).join('') + '</ul></div>';
+    }
+    if (party.weaknesses && party.weaknesses.length) {
+      body += '<div style="margin-top:0.5rem;"><strong style="color:var(--red);">Weaknesses:</strong><ul>' +
+        party.weaknesses.map(function(w) { return '<li style="color:var(--text-secondary);">' + escapeHtml(w) + '</li>'; }).join('') + '</ul></div>';
+    }
+    if (party.risk_factors && party.risk_factors.length) {
+      body += '<div style="margin-top:0.5rem;"><strong style="color:var(--amber);">Risk Factors:</strong><ul>' +
+        party.risk_factors.map(function(rf) { return '<li style="color:var(--text-secondary);">' + escapeHtml(rf) + '</li>'; }).join('') + '</ul></div>';
+    }
+
+    body += '</div></div>';
+  });
+
+  body += '<div class="why-step">' +
+    '<div class="why-step-number">&#10003;</div>' +
+    '<div class="why-step-content">' +
+      '<h4>Recommendation</h4>' +
+      '<p>' + escapeHtml(r.recommendation) + '</p>' +
+    '</div></div>';
+
+  body += '</div>';
+  openModal('Risk Assessment — Detailed Breakdown', body);
+}
+
+// ============================================================
+// 28. SETTLEMENT REASONING EXPLAINER
+// ============================================================
+function openWhySettlementResult() {
+  if (!lastSettlement) return;
+  var st = lastSettlement;
+  var d = st.damages_estimate;
+  var s = st.settlement_range;
+
+  var body = '<div class="why-result-container">';
+
+  body += '<div class="why-step">' +
+    '<div class="why-step-number">1</div>' +
+    '<div class="why-step-content">' +
+      '<h4>Damages Calculation</h4>' +
+      '<p>The system estimated total damages of <strong style="color:var(--gold);">' + fmtMoney(d.total) + '</strong> based on:</p>' +
+      '<table class="why-compare-table"><thead><tr><th>Component</th><th>Amount</th><th>Explanation</th></tr></thead><tbody>' +
+        '<tr><td>Compensatory</td><td>' + fmtMoney(d.compensatory) + '</td><td>Direct losses suffered by the injured party</td></tr>' +
+        '<tr><td>Consequential</td><td>' + fmtMoney(d.consequential) + '</td><td>Indirect but foreseeable losses flowing from the breach/harm</td></tr>' +
+        '<tr><td>Punitive</td><td>' + fmtMoney(d.punitive) + '</td><td>' + (d.punitive > 0 ? 'Punitive damages to deter egregious conduct' : 'Not applicable in this case type') + '</td></tr>' +
+        '<tr style="font-weight:700;color:var(--gold);"><td>Total</td><td>' + fmtMoney(d.total) + '</td><td>Confidence: ' + (d.confidence * 100).toFixed(0) + '%</td></tr>' +
+      '</tbody></table>' +
+      '<p style="margin-top:0.5rem;color:var(--text-muted);font-size:0.85rem;">Basis: ' + escapeHtml(d.basis) + '</p>' +
+    '</div></div>';
+
+  body += '<div class="why-step">' +
+    '<div class="why-step-number">2</div>' +
+    '<div class="why-step-content">' +
+      '<h4>Settlement Range Calculation</h4>' +
+      '<p>The settlement range was calculated by adjusting the estimated damages based on each party\'s probability of winning:</p>' +
+      '<div class="why-settlement-range">' +
+        '<div class="why-range-visual">' +
+          '<div class="why-range-bar">' +
+            '<div class="why-range-low">Low<br>' + fmtMoney(s.low) + '</div>' +
+            '<div class="why-range-mid">Recommended<br><strong>' + fmtMoney(s.recommended) + '</strong></div>' +
+            '<div class="why-range-high">High<br>' + fmtMoney(s.high) + '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<p style="margin-top:0.75rem;color:var(--text-secondary);">' + escapeHtml(s.rationale) + '</p>' +
+    '</div></div>';
+
+  body += '<div class="why-step">' +
+    '<div class="why-step-number">3</div>' +
+    '<div class="why-step-content">' +
+      '<h4>Litigation Cost Analysis</h4>' +
+      '<p>Estimated cost to litigate this case through trial: <strong style="color:var(--red);">' + fmtMoney(st.cost_of_litigation_estimate) + '</strong></p>' +
+      '<p>This estimate includes attorney fees, court costs, discovery expenses, expert witnesses, and other litigation expenses.</p>' +
+      (st.should_settle ?
+        '<p style="color:var(--green);margin-top:0.5rem;"><strong>Settlement is recommended</strong> because the potential litigation costs combined with the uncertainty of trial outcome make settling more cost-effective.</p>' :
+        '<p style="color:var(--amber);margin-top:0.5rem;"><strong>Litigation may be preferable</strong> because the expected trial outcome justifies the cost of continuing to trial.</p>') +
+    '</div></div>';
+
+  if (st.risk_summary && st.risk_summary.parties) {
+    body += '<div class="why-step">' +
+      '<div class="why-step-number">4</div>' +
+      '<div class="why-step-content">' +
+        '<h4>Risk Factor Impact</h4>' +
+        '<p>The settlement recommendation is influenced by each party\'s litigation risk:</p>' +
+        '<div class="why-risk-scores">';
+    st.risk_summary.parties.forEach(function(p) {
+      body += '<div class="why-risk-score-item">' +
+        '<span>' + escapeHtml(p.party_name) + ' (' + p.overall_grade + ')</span>' +
+        '<div class="why-bar-track"><div class="why-bar-fill" style="width:' + (p.win_probability * 100) + '%;background:var(--gold);"></div></div>' +
+        '<span>' + (p.win_probability * 100).toFixed(0) + '%</span>' +
+      '</div>';
+    });
+    body += '</div></div></div>';
+  }
+
+  body += '</div>';
+  openModal('Settlement Analysis — How It Was Calculated', body);
 }
