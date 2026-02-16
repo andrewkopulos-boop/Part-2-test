@@ -2188,3 +2188,142 @@ button:focus-visible {
 .modal-open .modal {
   max-width: 720px;
 }
+
+/* ---- LLM ENHANCEMENT STYLES ---- */
+.llm-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding: 0.35rem 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: default;
+}
+
+.llm-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.llm-dot-active {
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  animation: llm-pulse 2s infinite;
+}
+
+.llm-dot-inactive {
+  background: var(--text-muted);
+}
+
+@keyframes llm-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.btn-ai-enhance {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+  border-color: #6366f1 !important;
+  color: #fff !important;
+}
+
+.btn-ai-enhance:hover {
+  background: linear-gradient(135deg, #818cf8, #a78bfa) !important;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.4);
+}
+
+.btn-ai-enhance:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+/* LLM Enhancement Modal Content */
+.llm-enhancement {
+  padding: 0.5rem 0;
+}
+
+.llm-provider-badge {
+  display: inline-block;
+  padding: 0.3rem 0.75rem;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 20px;
+  margin-bottom: 1.25rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.llm-section {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.llm-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.llm-section-title {
+  color: var(--gold);
+  font-size: 0.95rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.llm-summary-text {
+  color: var(--text-primary);
+  font-size: 1rem;
+  line-height: 1.7;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: var(--radius);
+  border-left: 3px solid var(--gold);
+}
+
+.llm-opinion-text {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+.llm-opinion-text p {
+  margin-bottom: 0.75rem;
+}
+
+.llm-insights-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.llm-insight-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.llm-insight-icon {
+  color: var(--gold);
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.llm-dissent-section {
+  background: rgba(239, 68, 68, 0.05);
+  border-radius: var(--radius);
+  padding: 1rem;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}

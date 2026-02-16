@@ -461,3 +461,105 @@ def settlement_analysis(body: SettlementIn):
             ],
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# LLM Enhancement endpoints
+# ---------------------------------------------------------------------------
+
+from legal_judge.engine.llm import LLMEnhancer
+
+_llm_enhancer = LLMEnhancer()
+
+
+@app.get("/api/llm/status")
+def llm_status():
+    """Check if an LLM provider is configured."""
+    return {
+        "available": _llm_enhancer.available,
+        "provider": _llm_enhancer.provider_name,
+    }
+
+
+class EnhanceJudgmentIn(BaseModel):
+    case: CaseIn
+    judgment: dict
+
+@app.post("/api/llm/enhance-judgment")
+def enhance_judgment(body: EnhanceJudgmentIn):
+    """Enhance a judgment with LLM-generated reasoning."""
+    case_data = body.case.model_dump()
+    result = _llm_enhancer.enhance_judgment(case_data, body.judgment)
+    return {
+        "provider": result.provider,
+        "model": result.model,
+        "enhanced_opinion": result.enhanced_opinion,
+        "enhanced_reasoning": result.enhanced_reasoning,
+        "enhanced_dissent": result.enhanced_dissent,
+        "key_insights": result.key_insights,
+        "plain_english_summary": result.plain_english_summary,
+        "error": result.error,
+    }
+
+
+class EnhancePanelIn(BaseModel):
+    case: CaseIn
+    panel: dict
+
+@app.post("/api/llm/enhance-panel")
+def enhance_panel(body: EnhancePanelIn):
+    """Enhance a panel decision with LLM-generated reasoning."""
+    case_data = body.case.model_dump()
+    result = _llm_enhancer.enhance_panel(case_data, body.panel)
+    return {
+        "provider": result.provider,
+        "model": result.model,
+        "enhanced_opinion": result.enhanced_opinion,
+        "enhanced_reasoning": result.enhanced_reasoning,
+        "enhanced_dissent": result.enhanced_dissent,
+        "key_insights": result.key_insights,
+        "plain_english_summary": result.plain_english_summary,
+        "error": result.error,
+    }
+
+
+class EnhanceRiskIn(BaseModel):
+    case: CaseIn
+    risk: dict
+
+@app.post("/api/llm/enhance-risk")
+def enhance_risk(body: EnhanceRiskIn):
+    """Enhance a risk assessment with LLM analysis."""
+    case_data = body.case.model_dump()
+    result = _llm_enhancer.enhance_risk(case_data, body.risk)
+    return {
+        "provider": result.provider,
+        "model": result.model,
+        "enhanced_opinion": result.enhanced_opinion,
+        "enhanced_reasoning": result.enhanced_reasoning,
+        "enhanced_dissent": result.enhanced_dissent,
+        "key_insights": result.key_insights,
+        "plain_english_summary": result.plain_english_summary,
+        "error": result.error,
+    }
+
+
+class EnhanceSettlementIn(BaseModel):
+    case: CaseIn
+    settlement: dict
+
+@app.post("/api/llm/enhance-settlement")
+def enhance_settlement(body: EnhanceSettlementIn):
+    """Enhance a settlement analysis with LLM reasoning."""
+    case_data = body.case.model_dump()
+    result = _llm_enhancer.enhance_settlement(case_data, body.settlement)
+    return {
+        "provider": result.provider,
+        "model": result.model,
+        "enhanced_opinion": result.enhanced_opinion,
+        "enhanced_reasoning": result.enhanced_reasoning,
+        "enhanced_dissent": result.enhanced_dissent,
+        "key_insights": result.key_insights,
+        "plain_english_summary": result.plain_english_summary,
+        "error": result.error,
+    }
