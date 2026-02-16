@@ -10,6 +10,9 @@ let lastSettlement = null;
 let enumData = {};
 let knowledgeData = null;
 let activeKBDomain = 'all';
+let llmAvailable = false;
+let llmProvider = '';
+let lastCaseData = null;
 
 // ============================================================
 // 1. INITIALIZATION
@@ -26,6 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   addIssue();
   updateFieldsetCounts();
   await loadKnowledge();
+  await checkLLMStatus();
 });
 
 // ============================================================
@@ -540,6 +544,7 @@ async function submitCase() {
   showResultTabs();
 
   try {
+    lastCaseData = caseData;
     var resp = await fetch(API + '/judge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -576,7 +581,8 @@ function renderJudgment(j) {
     '<strong>' + escapeHtml(j.case_title) + '</strong> &mdash; ' + escapeHtml(j.date_decided) + '<br>' +
     'Prevailing party: <strong>' + escapeHtml(j.prevailing_party) + '</strong>' +
     (j.remedy !== 'none' ? ' &bull; Remedy: ' + j.remedy.replace(/_/g, ' ') : '') +
-    '<br><button class="btn-why-result" onclick="openWhyThisResult()">Why this result?</button>';
+    '<br><button class="btn-why-result" onclick="openWhyThisResult()">Why this result?</button>' +
+    (llmAvailable ? ' <button class="btn-why-result btn-ai-enhance" id="btn-enhance-judgment" onclick="enhanceJudgment()"><span class="btn-icon-sm">&#9733;</span> AI Enhance</button>' : '');
 
   // Score cards with confidence rings
   var cards = document.getElementById('score-cards');
@@ -941,6 +947,7 @@ function clearForm() {
 async function submitPanel() {
   var caseData = collectCase();
   if (!caseData.title) { showToast('Please enter a case title.', 'error'); return; }
+  lastCaseData = caseData;
   showLoading('Convening 3-judge panel...');
   showResultTabs();
 
@@ -980,6 +987,7 @@ function renderPanel(result) {
         'Confidence: ' + (result.majority_confidence * 100).toFixed(0) + '%' +
       '</div>' +
       '<button class="btn-why-result" onclick="openWhyPanelResult()" style="margin-top:0.75rem;">Why did the panel decide this way?</button>' +
+      (llmAvailable ? ' <button class="btn-why-result btn-ai-enhance" id="btn-enhance-panel" onclick="enhancePanel()" style="margin-top:0.75rem;"><span class="btn-icon-sm">&#9733;</span> AI Enhance</button>' : '') +
     '</div>' +
     '<div style="padding:1rem 0;">' +
       '<h3 style="color:var(--gold);margin-bottom:0.5rem;">Majority Opinion</h3>' +
@@ -1059,6 +1067,7 @@ function toggleJudgeCard(header) {
 async function runRiskAssessment() {
   var caseData = collectCase();
   if (!caseData.title) { showToast('Please enter a case title.', 'error'); return; }
+  lastCaseData = caseData;
   showLoading('Assessing litigation risk...');
   showResultTabs();
 
@@ -1100,6 +1109,7 @@ function renderRisk(result) {
         '<div class="risk-title">' + escapeHtml(result.case_title) + '</div>' +
       '</div>' +
       '<button class="btn-why-result" onclick="openWhyRiskResult()" style="margin-top:0.5rem;">Why this risk level?</button>' +
+      (llmAvailable ? ' <button class="btn-why-result btn-ai-enhance" id="btn-enhance-risk" onclick="enhanceRisk()" style="margin-top:0.5rem;"><span class="btn-icon-sm">&#9733;</span> AI Enhance</button>' : '') +
     '</div>' +
     '<div style="padding:0.75rem 0;color:var(--text-secondary);line-height:1.6;font-size:0.9rem;">' +
       escapeHtml(result.recommendation) +
@@ -1196,6 +1206,7 @@ async function executeSettlement() {
   closeModal();
 
   var caseData = collectCase();
+  lastCaseData = caseData;
   showLoading('Calculating settlement...');
   showResultTabs();
 
@@ -1243,6 +1254,7 @@ function renderSettlement(result) {
         escapeHtml(result.settlement_recommendation) +
       '</div>' +
       '<button class="btn-why-result" onclick="openWhySettlementResult()" style="margin-top:0.75rem;">How was this calculated?</button>' +
+      (llmAvailable ? ' <button class="btn-why-result btn-ai-enhance" id="btn-enhance-settlement" onclick="enhanceSettlement()" style="margin-top:0.75rem;"><span class="btn-icon-sm">&#9733;</span> AI Enhance</button>' : '') +
     '</div>' +
     '<div class="settlement-grid">' +
       '<div class="settlement-card">' +
@@ -1880,4 +1892,213 @@ function openWhySettlementResult() {
 
   body += '</div>';
   openModal('Settlement Analysis — How It Was Calculated', body);
+}
+
+// ============================================================
+// 29. LLM ENHANCEMENT INTEGRATION
+// ============================================================
+async function checkLLMStatus() {
+  try {
+    var resp = await fetch(API + '/llm/status');
+    var data = await resp.json();
+    llmAvailable = data.available;
+    llmProvider = data.provider || '';
+    updateLLMIndicator();
+  } catch (err) {
+    llmAvailable = false;
+  }
+}
+
+function updateLLMIndicator() {
+  var hint = document.querySelector('.header-hint');
+  if (!hint) return;
+  var existing = document.getElementById('llm-indicator');
+  if (existing) existing.remove();
+  var indicator = document.createElement('div');
+  indicator.id = 'llm-indicator';
+  indicator.className = 'llm-indicator';
+  if (llmAvailable) {
+    indicator.innerHTML = '<span class="llm-dot llm-dot-active"></span> AI: ' + escapeHtml(llmProvider);
+    indicator.title = 'LLM provider connected: ' + llmProvider;
+  } else {
+    indicator.innerHTML = '<span class="llm-dot llm-dot-inactive"></span> AI: Not Connected';
+    indicator.title = 'No LLM API key configured. Add GROQ_API_KEY, GEMINI_API_KEY, or OPENROUTER_API_KEY to Vercel environment variables.';
+  }
+  hint.parentNode.insertBefore(indicator, hint);
+}
+
+function collectCaseForLLM() {
+  return lastCaseData || collectCase();
+}
+
+async function enhanceJudgment() {
+  if (!lastJudgment) { showToast('No judgment to enhance.', 'error'); return; }
+  if (!llmAvailable) {
+    showToast('No LLM API configured. Add an API key in Vercel settings.', 'error');
+    return;
+  }
+  var btn = document.getElementById('btn-enhance-judgment');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enhancing...'; }
+
+  try {
+    var resp = await fetch(API + '/llm/enhance-judgment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ case: collectCaseForLLM(), judgment: lastJudgment }),
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    var data = await resp.json();
+    if (data.error) {
+      showToast('LLM error: ' + data.error, 'error');
+      return;
+    }
+    showLLMEnhancement('AI-Enhanced Judgment Analysis', data);
+    showToast('AI enhancement complete via ' + data.provider + '.', 'success');
+  } catch (err) {
+    showToast('Enhancement failed: ' + err.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="btn-icon-sm">&#9733;</span> AI Enhance'; }
+  }
+}
+
+async function enhancePanel() {
+  if (!lastPanel) { showToast('No panel decision to enhance.', 'error'); return; }
+  if (!llmAvailable) {
+    showToast('No LLM API configured. Add an API key in Vercel settings.', 'error');
+    return;
+  }
+  var btn = document.getElementById('btn-enhance-panel');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enhancing...'; }
+
+  try {
+    var resp = await fetch(API + '/llm/enhance-panel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ case: collectCaseForLLM(), panel: lastPanel }),
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    var data = await resp.json();
+    if (data.error) {
+      showToast('LLM error: ' + data.error, 'error');
+      return;
+    }
+    showLLMEnhancement('AI-Enhanced Panel Analysis', data);
+    showToast('AI enhancement complete via ' + data.provider + '.', 'success');
+  } catch (err) {
+    showToast('Enhancement failed: ' + err.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="btn-icon-sm">&#9733;</span> AI Enhance'; }
+  }
+}
+
+async function enhanceRisk() {
+  if (!lastRisk) { showToast('No risk assessment to enhance.', 'error'); return; }
+  if (!llmAvailable) {
+    showToast('No LLM API configured. Add an API key in Vercel settings.', 'error');
+    return;
+  }
+  var btn = document.getElementById('btn-enhance-risk');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enhancing...'; }
+
+  try {
+    var resp = await fetch(API + '/llm/enhance-risk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ case: collectCaseForLLM(), risk: lastRisk }),
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    var data = await resp.json();
+    if (data.error) {
+      showToast('LLM error: ' + data.error, 'error');
+      return;
+    }
+    showLLMEnhancement('AI-Enhanced Risk Analysis', data);
+    showToast('AI enhancement complete via ' + data.provider + '.', 'success');
+  } catch (err) {
+    showToast('Enhancement failed: ' + err.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="btn-icon-sm">&#9733;</span> AI Enhance'; }
+  }
+}
+
+async function enhanceSettlement() {
+  if (!lastSettlement) { showToast('No settlement analysis to enhance.', 'error'); return; }
+  if (!llmAvailable) {
+    showToast('No LLM API configured. Add an API key in Vercel settings.', 'error');
+    return;
+  }
+  var btn = document.getElementById('btn-enhance-settlement');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enhancing...'; }
+
+  try {
+    var resp = await fetch(API + '/llm/enhance-settlement', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ case: collectCaseForLLM(), settlement: lastSettlement }),
+    });
+    if (!resp.ok) throw new Error(await resp.text());
+    var data = await resp.json();
+    if (data.error) {
+      showToast('LLM error: ' + data.error, 'error');
+      return;
+    }
+    showLLMEnhancement('AI-Enhanced Settlement Analysis', data);
+    showToast('AI enhancement complete via ' + data.provider + '.', 'success');
+  } catch (err) {
+    showToast('Enhancement failed: ' + err.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="btn-icon-sm">&#9733;</span> AI Enhance'; }
+  }
+}
+
+function showLLMEnhancement(title, data) {
+  var body = '<div class="llm-enhancement">';
+  body += '<div class="llm-provider-badge">Powered by ' + escapeHtml(data.provider) + ' (' + escapeHtml(data.model) + ')</div>';
+
+  if (data.plain_english_summary) {
+    body += '<div class="llm-section">' +
+      '<h4 class="llm-section-title">Plain English Summary</h4>' +
+      '<p class="llm-summary-text">' + escapeHtml(data.plain_english_summary) + '</p>' +
+    '</div>';
+  }
+
+  if (data.enhanced_opinion) {
+    body += '<div class="llm-section">' +
+      '<h4 class="llm-section-title">AI-Enhanced Opinion</h4>' +
+      '<div class="llm-opinion-text">' + formatLLMText(data.enhanced_opinion) + '</div>' +
+    '</div>';
+  }
+
+  if (data.enhanced_reasoning) {
+    body += '<div class="llm-section">' +
+      '<h4 class="llm-section-title">Detailed Reasoning</h4>' +
+      '<div class="llm-opinion-text">' + formatLLMText(data.enhanced_reasoning) + '</div>' +
+    '</div>';
+  }
+
+  if (data.key_insights && data.key_insights.length) {
+    body += '<div class="llm-section">' +
+      '<h4 class="llm-section-title">Key Insights</h4>' +
+      '<ul class="llm-insights-list">' +
+      data.key_insights.map(function(insight) {
+        return '<li class="llm-insight-item"><span class="llm-insight-icon">&#9733;</span> ' + escapeHtml(insight) + '</li>';
+      }).join('') +
+      '</ul></div>';
+  }
+
+  if (data.enhanced_dissent) {
+    body += '<div class="llm-section llm-dissent-section">' +
+      '<h4 class="llm-section-title" style="color:var(--red);">Counterargument / Dissent</h4>' +
+      '<div class="llm-opinion-text">' + formatLLMText(data.enhanced_dissent) + '</div>' +
+    '</div>';
+  }
+
+  body += '</div>';
+  openModal(title, body);
+}
+
+function formatLLMText(text) {
+  if (!text) return '';
+  // Convert line breaks to <br> and escape HTML
+  return escapeHtml(text).replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>');
 }
