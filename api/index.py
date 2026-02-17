@@ -1,7 +1,8 @@
 """FastAPI application serving the Legal Judge Bot API.
 
 Vercel-compatible: this module is auto-discovered as a serverless function
-at the /api route prefix.
+at the /api route prefix.  When running locally, also serves static files
+from the public/ directory so the full UI works without Vercel.
 """
 
 from __future__ import annotations
@@ -16,7 +17,8 @@ if _project_root not in sys.path:
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from legal_judge.knowledge.base import KnowledgeBase
@@ -533,10 +535,11 @@ def _enhancement_to_dict(result: LLMEnhancement) -> dict:
 
 @app.get("/api/llm/status")
 def llm_status():
-    """Check if an LLM provider is configured."""
+    """Check if AI enhancement is available (always true with rule-based fallback)."""
+    has_llm = _llm_enhancer.available
     return {
-        "available": _llm_enhancer.available,
-        "provider": _llm_enhancer.provider_name,
+        "available": True,  # Always available: LLM when configured, rule-based fallback otherwise
+        "provider": _llm_enhancer.provider_name if has_llm else "Rule-Based Analysis",
     }
 
 
@@ -622,3 +625,23 @@ def enhance_settlement(body: EnhanceSettlementIn):
         "plain_english_summary": result.plain_english_summary,
         "error": result.error,
     }
+
+
+# ---------------------------------------------------------------------------
+# Static file serving (for local development; Vercel handles this in prod)
+# ---------------------------------------------------------------------------
+
+_public_dir = Path(__file__).resolve().parent.parent / "public"
+
+if _public_dir.is_dir():
+    @app.get("/styles.css")
+    def serve_css():
+        return FileResponse(_public_dir / "styles.css", media_type="text/css")
+
+    @app.get("/app.js")
+    def serve_js():
+        return FileResponse(_public_dir / "app.js", media_type="application/javascript")
+
+    @app.get("/")
+    def serve_index():
+        return FileResponse(_public_dir / "index.html", media_type="text/html")

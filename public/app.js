@@ -647,7 +647,7 @@ function renderJudgment(j) {
     'Prevailing party: <strong>' + escapeHtml(j.prevailing_party) + '</strong>' +
     (j.remedy !== 'none' ? ' &bull; Remedy: ' + j.remedy.replace(/_/g, ' ') : '') +
     '<br><button class="btn-why-result" onclick="openWhyThisResult()">Why this result?</button>' +
-    (llmAvailable ? ' <button class="btn-why-result btn-ai-enhance" id="btn-enhance-judgment" onclick="enhanceJudgment()"><span class="btn-icon-sm">&#9733;</span> AI Enhance</button>' : '');
+    ' <button class="btn-why-result btn-ai-enhance" id="btn-enhance-judgment" onclick="enhanceJudgment()"><span class="btn-icon-sm">&#9733;</span> AI Enhance</button>';
 
   // Score cards with confidence rings
   var cards = document.getElementById('score-cards');
@@ -1052,6 +1052,7 @@ async function submitPanel() {
     activateResultTab('panel');
     showToast('Panel decision rendered.', 'success');
   } catch (err) {
+    stopLoadingPhases();
     document.getElementById('judgment-loading').style.display = 'none';
     document.getElementById('judgment-empty').style.display = '';
     showToast('Panel error: ' + err.message, 'error');
@@ -1074,7 +1075,7 @@ function renderPanel(result) {
         'Confidence: ' + (result.majority_confidence * 100).toFixed(0) + '%' +
       '</div>' +
       '<button class="btn-why-result" onclick="openWhyPanelResult()" style="margin-top:0.75rem;">Why did the panel decide this way?</button>' +
-      (llmAvailable ? ' <button class="btn-why-result btn-ai-enhance" id="btn-enhance-panel" onclick="enhancePanel()" style="margin-top:0.75rem;"><span class="btn-icon-sm">&#9733;</span> AI Enhance</button>' : '') +
+      ' <button class="btn-why-result btn-ai-enhance" id="btn-enhance-panel" onclick="enhancePanel()" style="margin-top:0.75rem;"><span class="btn-icon-sm">&#9733;</span> AI Enhance</button>' +
     '</div>' +
     '<div style="padding:1rem 0;">' +
       '<h3 style="color:var(--gold);margin-bottom:0.5rem;">Majority Opinion</h3>' +
@@ -1197,7 +1198,7 @@ function renderRisk(result) {
         '<div class="risk-title">' + escapeHtml(result.case_title) + '</div>' +
       '</div>' +
       '<button class="btn-why-result" onclick="openWhyRiskResult()" style="margin-top:0.5rem;">Why this risk level?</button>' +
-      (llmAvailable ? ' <button class="btn-why-result btn-ai-enhance" id="btn-enhance-risk" onclick="enhanceRisk()" style="margin-top:0.5rem;"><span class="btn-icon-sm">&#9733;</span> AI Enhance</button>' : '') +
+      ' <button class="btn-why-result btn-ai-enhance" id="btn-enhance-risk" onclick="enhanceRisk()" style="margin-top:0.5rem;"><span class="btn-icon-sm">&#9733;</span> AI Enhance</button>' +
     '</div>' +
     '<div style="padding:0.75rem 0;color:var(--text-secondary);line-height:1.6;font-size:0.9rem;">' +
       escapeHtml(result.recommendation) +
@@ -1343,7 +1344,7 @@ function renderSettlement(result) {
         escapeHtml(result.settlement_recommendation) +
       '</div>' +
       '<button class="btn-why-result" onclick="openWhySettlementResult()" style="margin-top:0.75rem;">How was this calculated?</button>' +
-      (llmAvailable ? ' <button class="btn-why-result btn-ai-enhance" id="btn-enhance-settlement" onclick="enhanceSettlement()" style="margin-top:0.75rem;"><span class="btn-icon-sm">&#9733;</span> AI Enhance</button>' : '') +
+      ' <button class="btn-why-result btn-ai-enhance" id="btn-enhance-settlement" onclick="enhanceSettlement()" style="margin-top:0.75rem;"><span class="btn-icon-sm">&#9733;</span> AI Enhance</button>' +
     '</div>' +
     '<div class="settlement-grid">' +
       '<div class="settlement-card">' +
@@ -2022,10 +2023,6 @@ function collectCaseForLLM() {
 
 async function enhanceJudgment() {
   if (!lastJudgment) { showToast('No judgment to enhance.', 'error'); return; }
-  if (!llmAvailable) {
-    showToast('No LLM API configured. Add an API key in Vercel settings.', 'error');
-    return;
-  }
   var btn = document.getElementById('btn-enhance-judgment');
   if (btn) { btn.disabled = true; btn.textContent = 'Enhancing...'; }
 
@@ -2052,10 +2049,6 @@ async function enhanceJudgment() {
 
 async function enhancePanel() {
   if (!lastPanel) { showToast('No panel decision to enhance.', 'error'); return; }
-  if (!llmAvailable) {
-    showToast('No LLM API configured. Add an API key in Vercel settings.', 'error');
-    return;
-  }
   var btn = document.getElementById('btn-enhance-panel');
   if (btn) { btn.disabled = true; btn.textContent = 'Enhancing...'; }
 
@@ -2082,10 +2075,6 @@ async function enhancePanel() {
 
 async function enhanceRisk() {
   if (!lastRisk) { showToast('No risk assessment to enhance.', 'error'); return; }
-  if (!llmAvailable) {
-    showToast('No LLM API configured. Add an API key in Vercel settings.', 'error');
-    return;
-  }
   var btn = document.getElementById('btn-enhance-risk');
   if (btn) { btn.disabled = true; btn.textContent = 'Enhancing...'; }
 
@@ -2112,10 +2101,6 @@ async function enhanceRisk() {
 
 async function enhanceSettlement() {
   if (!lastSettlement) { showToast('No settlement analysis to enhance.', 'error'); return; }
-  if (!llmAvailable) {
-    showToast('No LLM API configured. Add an API key in Vercel settings.', 'error');
-    return;
-  }
   var btn = document.getElementById('btn-enhance-settlement');
   if (btn) { btn.disabled = true; btn.textContent = 'Enhancing...'; }
 

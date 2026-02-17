@@ -222,39 +222,33 @@ class LLMEnhancer:
     def enhance_judgment(self, case_data: dict, judgment_data: dict) -> LLMEnhancement:
         """Enhance a judgment with LLM-generated analysis."""
         if not self._client.available:
-            return LLMEnhancement(error="No LLM API key configured")
+            return self._rule_based_judgment_enhancement(case_data, judgment_data)
 
         user_prompt = self._build_judgment_prompt(case_data, judgment_data)
         raw = self._client.call(_SYSTEM_PROMPT, user_prompt)
 
         if not raw:
-            return LLMEnhancement(
-                provider=self._client.provider_name,
-                error="LLM returned empty response",
-            )
+            return self._rule_based_judgment_enhancement(case_data, judgment_data)
 
         return self._parse_response(raw)
 
     def enhance_panel(self, case_data: dict, panel_data: dict) -> LLMEnhancement:
         """Enhance a panel decision with LLM-generated analysis."""
         if not self._client.available:
-            return LLMEnhancement(error="No LLM API key configured")
+            return self._rule_based_panel_enhancement(case_data, panel_data)
 
         user_prompt = self._build_panel_prompt(case_data, panel_data)
         raw = self._client.call(_SYSTEM_PROMPT, user_prompt)
 
         if not raw:
-            return LLMEnhancement(
-                provider=self._client.provider_name,
-                error="LLM returned empty response",
-            )
+            return self._rule_based_panel_enhancement(case_data, panel_data)
 
         return self._parse_response(raw)
 
     def enhance_risk(self, case_data: dict, risk_data: dict) -> LLMEnhancement:
         """Enhance a risk assessment with LLM analysis."""
         if not self._client.available:
-            return LLMEnhancement(error="No LLM API key configured")
+            return self._rule_based_risk_enhancement(case_data, risk_data)
 
         prompt = (
             f"Analyze this litigation risk assessment and provide deeper insight.\n\n"
@@ -276,7 +270,7 @@ class LLMEnhancer:
     def enhance_settlement(self, case_data: dict, settlement_data: dict) -> LLMEnhancement:
         """Enhance a settlement analysis with LLM reasoning."""
         if not self._client.available:
-            return LLMEnhancement(error="No LLM API key configured")
+            return self._rule_based_settlement_enhancement(case_data, settlement_data)
 
         prompt = (
             f"Analyze this settlement recommendation and provide deeper insight.\n\n"
@@ -296,6 +290,189 @@ class LLMEnhancer:
         if not raw:
             return LLMEnhancement(provider=self._client.provider_name, error="LLM returned empty response")
         return self._parse_response(raw)
+
+    # ------------------------------------------------------------------
+    # Rule-based fallback enhancements (when no LLM key is configured)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _rule_based_judgment_enhancement(
+        case_data: dict, judgment_data: dict
+    ) -> LLMEnhancement:
+        """Generate AI-style insights from the rule-based judgment data."""
+        disp = judgment_data.get("disposition", "unknown").replace("_", " ")
+        title = case_data.get("title", "This case")
+        prevailing = judgment_data.get("prevailing_party", "the moving party")
+        confidence = judgment_data.get("confidence", 0)
+        evidence_strength = judgment_data.get("strength_of_evidence", 0)
+        rules = judgment_data.get("rules_applied", [])
+        issues = judgment_data.get("issues_addressed", [])
+        holding = judgment_data.get("holding", "")
+        reasoning = judgment_data.get("reasoning", "")
+        remedy = judgment_data.get("remedy", "none").replace("_", " ")
+
+        # Build plain English summary
+        summary = (
+            f"In {title}, the court ruled {disp} in favor of {prevailing} "
+            f"with {confidence:.0%} confidence. "
+        )
+        if evidence_strength > 0.7:
+            summary += "The evidence strongly supported this outcome. "
+        elif evidence_strength > 0.5:
+            summary += "The evidence moderately supported the ruling. "
+        else:
+            summary += "The evidence was mixed but sufficient for the decision. "
+        if remedy != "none":
+            summary += f"The court ordered {remedy} as a remedy."
+
+        # Build insights
+        insights: list[str] = []
+        if rules:
+            insights.append(
+                f"Court applied {len(rules)} legal rule(s): {', '.join(rules[:3])}"
+            )
+        if issues:
+            insights.append(f"Addressed {len(issues)} legal issue(s) in the analysis")
+        if confidence >= 0.8:
+            insights.append("High confidence ruling — strong legal basis for the decision")
+        elif confidence >= 0.6:
+            insights.append("Moderate confidence — outcome could shift with additional evidence")
+        else:
+            insights.append("Lower confidence — the case presented close legal questions")
+        if evidence_strength >= 0.7:
+            insights.append("Evidence strength was above threshold for clear determination")
+        if judgment_data.get("dissent"):
+            insights.append("A dissenting opinion was filed, indicating contested legal questions")
+
+        # Build enhanced opinion
+        opinion = holding or reasoning or "The court reached its determination through IRAC analysis."
+
+        return LLMEnhancement(
+            provider="Rule-Based Analysis",
+            model="IRAC Engine v4",
+            enhanced_opinion=opinion,
+            enhanced_reasoning=reasoning,
+            enhanced_dissent=judgment_data.get("dissent", ""),
+            key_insights=insights,
+            plain_english_summary=summary,
+        )
+
+    @staticmethod
+    def _rule_based_panel_enhancement(
+        case_data: dict, panel_data: dict
+    ) -> LLMEnhancement:
+        """Generate insights from panel decision data."""
+        title = case_data.get("title", "This case")
+        unanimous = panel_data.get("is_unanimous", False)
+        disp = panel_data.get("majority_disposition", "unknown").replace("_", " ")
+        vote = panel_data.get("majority_vote", 0)
+        size = panel_data.get("panel_size", 3)
+        conf = panel_data.get("majority_confidence", 0)
+        opinions = panel_data.get("opinions", [])
+
+        summary = f"A {size}-judge panel "
+        if unanimous:
+            summary += f"unanimously ruled {disp} in {title}. "
+        else:
+            summary += f"reached a {vote}-{size - vote} split decision of {disp} in {title}. "
+        summary += f"The majority expressed {conf:.0%} confidence in the outcome."
+
+        insights: list[str] = []
+        if unanimous:
+            insights.append("Unanimous decision strengthens precedential value")
+        else:
+            insights.append(f"Split {vote}-{size - vote} decision signals contested legal ground")
+
+        philosophies = [op.get("philosophy", "") for op in opinions if op.get("philosophy")]
+        if philosophies:
+            insights.append(f"Judicial philosophies represented: {', '.join(set(philosophies))}")
+
+        dissenters = [op for op in opinions if not op.get("agrees_with_majority", True)]
+        if dissenters:
+            for d in dissenters:
+                insights.append(
+                    f"Judge {d.get('judge_name', '?')} dissented — "
+                    f"{d.get('philosophy', 'different interpretation')}"
+                )
+
+        if conf >= 0.8:
+            insights.append("High majority confidence indicates strong legal consensus")
+
+        return LLMEnhancement(
+            provider="Rule-Based Analysis",
+            model="Panel Engine v4",
+            enhanced_opinion=panel_data.get("majority_opinion", ""),
+            key_insights=insights,
+            plain_english_summary=summary,
+        )
+
+    @staticmethod
+    def _rule_based_risk_enhancement(
+        case_data: dict, risk_data: dict
+    ) -> LLMEnhancement:
+        """Generate insights from risk assessment data."""
+        title = case_data.get("title", "This case")
+        level = risk_data.get("litigation_risk_level", "unknown").replace("_", " ")
+        rec = risk_data.get("recommendation", "")
+        parties = risk_data.get("parties", [])
+
+        summary = (
+            f"The litigation risk for {title} is assessed as {level}. {rec}"
+        )
+
+        insights: list[str] = []
+        insights.append(f"Overall litigation risk level: {level}")
+        for p in parties[:4]:
+            name = p.get("party_name", "?")
+            grade = p.get("overall_grade", "?")
+            win_prob = p.get("win_probability", 0)
+            insights.append(f"{name}: Grade {grade}, {win_prob:.0%} win probability")
+
+        return LLMEnhancement(
+            provider="Rule-Based Analysis",
+            model="Risk Engine v4",
+            enhanced_opinion=rec,
+            key_insights=insights,
+            plain_english_summary=summary,
+        )
+
+    @staticmethod
+    def _rule_based_settlement_enhancement(
+        case_data: dict, settlement_data: dict
+    ) -> LLMEnhancement:
+        """Generate insights from settlement data."""
+        title = case_data.get("title", "This case")
+        should_settle = settlement_data.get("should_settle", False)
+        sr = settlement_data.get("settlement_range", {})
+        rec = settlement_data.get("settlement_recommendation", "")
+
+        action = "settle" if should_settle else "proceed to trial"
+        summary = (
+            f"For {title}, the recommendation is to {action}. "
+        )
+        if sr:
+            summary += (
+                f"The estimated settlement range is "
+                f"${sr.get('low', 0):,.0f} to ${sr.get('high', 0):,.0f}, "
+                f"with a recommended target of ${sr.get('recommended', 0):,.0f}."
+            )
+
+        insights: list[str] = []
+        insights.append(f"Recommendation: {action}")
+        if sr:
+            insights.append(
+                f"Settlement range: ${sr.get('low', 0):,.0f} – ${sr.get('high', 0):,.0f}"
+            )
+        if rec:
+            insights.append(rec[:150])
+
+        return LLMEnhancement(
+            provider="Rule-Based Analysis",
+            model="Settlement Engine v4",
+            enhanced_opinion=rec,
+            key_insights=insights,
+            plain_english_summary=summary,
+        )
 
     # ------------------------------------------------------------------
     # Prompt builders
