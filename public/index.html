@@ -4,9 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Legal Judge Bot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
+
+  <!-- PARTICLE BACKGROUND CANVAS -->
+  <canvas id="particles-canvas"></canvas>
+
+  <!-- CONFETTI CONTAINER -->
+  <div id="confetti-container" class="confetti-container"></div>
 
   <!-- TOAST NOTIFICATIONS -->
   <div id="toast-container" class="toast-container"></div>
@@ -26,22 +35,40 @@
   <div class="app">
     <!-- HEADER -->
     <header class="header">
+      <div class="header-glow"></div>
       <div class="header-inner">
         <div class="logo">
           <div class="logo-icon">
-            <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-              <rect width="36" height="36" rx="10" fill="#1a1a2e"/>
-              <path d="M18 6L9 11v5l9 5 9-5v-5L18 6z" fill="#c9a84c" opacity="0.9"/>
-              <path d="M9 16v5l9 5 9-5v-5l-9 5-9-5z" fill="#c9a84c" opacity="0.6"/>
-              <path d="M9 21v5l9 5 9-5v-5l-9 5-9-5z" fill="#c9a84c" opacity="0.3"/>
+            <svg width="42" height="42" viewBox="0 0 42 42" fill="none">
+              <defs>
+                <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style="stop-color:#d4a843;stop-opacity:1" />
+                  <stop offset="100%" style="stop-color:#ecd278;stop-opacity:1" />
+                </linearGradient>
+                <filter id="logo-glow">
+                  <feGaussianBlur stdDeviation="2" result="blur"/>
+                  <feMerge>
+                    <feMergeNode in="blur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+              </defs>
+              <rect width="42" height="42" rx="12" fill="#0a0a1a"/>
+              <rect x="1" y="1" width="40" height="40" rx="11" fill="none" stroke="url(#logo-grad)" stroke-opacity="0.3" stroke-width="1"/>
+              <g filter="url(#logo-glow)">
+                <path d="M21 7L10 13v6l11 6 11-6v-6L21 7z" fill="url(#logo-grad)" opacity="0.95"/>
+                <path d="M10 19v6l11 6 11-6v-6l-11 6-11-6z" fill="url(#logo-grad)" opacity="0.55"/>
+                <path d="M10 25v6l11 6 11-6v-6l-11 6-11-6z" fill="url(#logo-grad)" opacity="0.25"/>
+              </g>
             </svg>
           </div>
           <div>
-            <h1 class="logo-title">Legal Judge Bot</h1>
+            <h1 class="logo-title gradient-text">Legal Judge Bot</h1>
             <p class="logo-sub">AI-Powered Judicial Analysis Engine</p>
           </div>
         </div>
         <nav class="nav">
+          <div class="tab-indicator" id="tab-indicator"></div>
           <button class="nav-btn active" data-tab="judge">
             <span class="nav-icon">&#9878;</span> Judge a Case
           </button>
@@ -52,10 +79,13 @@
             <span class="nav-icon">&#128203;</span> Case History
           </button>
         </nav>
-        <div class="header-hint">
-          <kbd>Ctrl</kbd>+<kbd>Enter</kbd> to submit
+        <div class="header-right">
+          <div class="header-hint">
+            <kbd>Ctrl</kbd>+<kbd>Enter</kbd> to submit
+          </div>
         </div>
       </div>
+      <div class="header-gradient-line"></div>
     </header>
 
     <!-- MAIN -->
@@ -65,7 +95,7 @@
       <section class="tab-panel active" id="tab-judge">
         <div class="split-layout">
           <!-- LEFT: Case builder -->
-          <div class="panel case-builder">
+          <div class="panel case-builder glow-border">
             <div class="panel-header">
               <h2>Case Builder</h2>
               <div class="demo-btns">
@@ -211,7 +241,7 @@
           </div>
 
           <!-- RIGHT: Results panel with tabs -->
-          <div class="panel judgment-panel">
+          <div class="panel judgment-panel glow-border">
             <div class="panel-header">
               <h2>Analysis Results</h2>
               <div class="result-tabs" id="result-tabs" style="display:none;">
@@ -230,31 +260,65 @@
             <!-- Empty state -->
             <div id="judgment-empty" class="empty-state">
               <div class="empty-icon">
-                <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-                  <circle cx="40" cy="40" r="38" stroke="#333" stroke-width="2" stroke-dasharray="6 4"/>
-                  <path d="M40 20L24 28v8l16 8 16-8v-8L40 20z" fill="#333" opacity="0.3"/>
-                  <path d="M24 36v8l16 8 16-8v-8l-16 8-16-8z" fill="#333" opacity="0.2"/>
-                  <path d="M24 44v8l16 8 16-8v-8l-16 8-16-8z" fill="#333" opacity="0.1"/>
+                <svg width="100" height="100" viewBox="0 0 100 100" fill="none">
+                  <defs>
+                    <linearGradient id="empty-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" style="stop-color:#d4a843;stop-opacity:0.3" />
+                      <stop offset="100%" style="stop-color:#a78bfa;stop-opacity:0.1" />
+                    </linearGradient>
+                  </defs>
+                  <circle cx="50" cy="50" r="47" stroke="url(#empty-grad)" stroke-width="2" stroke-dasharray="8 6">
+                    <animateTransform attributeName="transform" type="rotate" values="0 50 50;360 50 50" dur="60s" repeatCount="indefinite"/>
+                  </circle>
+                  <circle cx="50" cy="50" r="38" stroke="url(#empty-grad)" stroke-width="1" stroke-dasharray="4 8" opacity="0.5">
+                    <animateTransform attributeName="transform" type="rotate" values="360 50 50;0 50 50" dur="45s" repeatCount="indefinite"/>
+                  </circle>
+                  <g opacity="0.4">
+                    <path d="M50 22L30 32v10l20 10 20-10v-10L50 22z" fill="#d4a843" opacity="0.4"/>
+                    <path d="M30 42v10l20 10 20-10v-10l-20 10-20-10z" fill="#d4a843" opacity="0.25"/>
+                    <path d="M30 52v10l20 10 20-10v-10l-20 10-20-10z" fill="#d4a843" opacity="0.12"/>
+                  </g>
                 </svg>
               </div>
               <p class="empty-title">No analysis rendered yet</p>
               <p class="empty-sub">Build a case on the left and click an action button. Try loading a demo case to get started quickly.</p>
-              <div style="margin-top:1.5rem;display:flex;gap:0.5rem;">
-                <button class="btn btn-sm btn-outline" onclick="loadDemo('contract');submitCase();">Quick Demo</button>
+              <div style="margin-top:1.5rem;display:flex;gap:0.75rem;flex-wrap:wrap;justify-content:center;">
+                <button class="btn btn-sm btn-primary" onclick="loadDemo('contract');submitCase();">Quick Demo</button>
+                <button class="btn btn-sm btn-outline" onclick="loadDemo('tort')">Load Tort Case</button>
+                <button class="btn btn-sm btn-outline" onclick="loadDemo('criminal')">Load Criminal Case</button>
               </div>
             </div>
 
             <!-- Loading -->
             <div id="judgment-loading" class="loading-state" style="display:none;">
               <div class="loading-spinner">
-                <svg viewBox="0 0 60 60" width="60" height="60">
-                  <circle cx="30" cy="30" r="26" fill="none" stroke="var(--border)" stroke-width="4"/>
-                  <circle cx="30" cy="30" r="26" fill="none" stroke="var(--gold)" stroke-width="4"
-                    stroke-dasharray="40 120" stroke-linecap="round" class="spinner-ring"/>
+                <svg viewBox="0 0 80 80" width="80" height="80">
+                  <defs>
+                    <linearGradient id="spinner-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" style="stop-color:#d4a843;stop-opacity:1" />
+                      <stop offset="50%" style="stop-color:#ecd278;stop-opacity:1" />
+                      <stop offset="100%" style="stop-color:#a78bfa;stop-opacity:0.5" />
+                    </linearGradient>
+                  </defs>
+                  <circle cx="40" cy="40" r="34" fill="none" stroke="var(--border)" stroke-width="3" opacity="0.3"/>
+                  <circle cx="40" cy="40" r="34" fill="none" stroke="url(#spinner-grad)" stroke-width="3"
+                    stroke-dasharray="50 160" stroke-linecap="round" class="spinner-ring"/>
+                  <circle cx="40" cy="40" r="24" fill="none" stroke="var(--border)" stroke-width="2" opacity="0.15"/>
+                  <circle cx="40" cy="40" r="24" fill="none" stroke="var(--gold)" stroke-width="2"
+                    stroke-dasharray="30 120" stroke-linecap="round" class="spinner-ring-inner"/>
                 </svg>
               </div>
               <p class="loading-text">Analyzing case...</p>
-              <p class="loading-sub">Applying IRAC framework &bull; Matching precedents &bull; Weighing evidence</p>
+              <p class="loading-sub phase-text">Applying IRAC framework...</p>
+              <div class="loading-phases">
+                <div class="loading-phase-dots">
+                  <span class="phase-dot active"></span>
+                  <span class="phase-dot"></span>
+                  <span class="phase-dot"></span>
+                  <span class="phase-dot"></span>
+                  <span class="phase-dot"></span>
+                </div>
+              </div>
             </div>
 
             <!-- Result -->
@@ -262,10 +326,13 @@
               <!-- Judgment view -->
               <div id="view-judgment" class="result-view active">
                 <div class="verdict-banner" id="verdict-banner">
-                  <div class="verdict-disposition" id="verdict-disposition"></div>
+                  <div class="verdict-stamp" id="verdict-stamp">
+                    <div class="verdict-disposition" id="verdict-disposition"></div>
+                  </div>
                   <div class="verdict-meta" id="verdict-meta"></div>
                 </div>
                 <div class="score-cards" id="score-cards"></div>
+                <div class="inline-ai-insights" id="inline-ai-insights" style="display:none;"></div>
                 <div class="opinion-sections" id="opinion-sections"></div>
                 <div class="dissent-section" id="dissent-section" style="display:none;"></div>
               </div>
@@ -339,7 +406,7 @@
     </main>
 
     <footer class="footer">
-      <p>Legal Judge Bot v4.0 &mdash; AI-powered judicial analysis with IRAC reasoning, multi-judge panels, risk assessment &amp; settlement calculator. For educational and research purposes only.</p>
+      <p>Legal Judge Bot v5.0 &mdash; AI-powered judicial analysis with IRAC reasoning, multi-judge panels, risk assessment &amp; settlement calculator. For educational and research purposes only.</p>
     </footer>
   </div>
 
