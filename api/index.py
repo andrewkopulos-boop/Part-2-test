@@ -275,7 +275,14 @@ def get_demo(case_name: str):
 def judge_case(body: CaseIn):
     case = _to_case(body)
     judgment = _engine.adjudicate(case)
-    return _judgment_to_dict(judgment)
+    result = _judgment_to_dict(judgment)
+
+    # Automatically enhance with AI when available.
+    case_data = body.model_dump()
+    enhancement = _llm_enhancer.enhance_judgment(case_data, result)
+    result["ai_enhancement"] = _enhancement_to_dict(enhancement)
+
+    return result
 
 
 @app.post("/api/appeal")
@@ -374,6 +381,19 @@ def panel_decision(body: CaseIn):
     }
     if decision.judgment:
         result["judgment"] = _judgment_to_dict(decision.judgment)
+
+    # Automatically enhance with AI when available.
+    case_data = body.model_dump()
+    panel_data = {
+        "majority_disposition": decision.majority_disposition.value,
+        "majority_vote": decision.majority_vote,
+        "is_unanimous": decision.is_unanimous,
+        "majority_confidence": decision.majority_confidence,
+        "opinions": decision.opinions,
+    }
+    enhancement = _llm_enhancer.enhance_panel(case_data, panel_data)
+    result["ai_enhancement"] = _enhancement_to_dict(enhancement)
+
     return result
 
 
@@ -391,7 +411,7 @@ def risk_assessment(body: RiskIn):
     case = _to_case(body.case)
     assessor = RiskAssessor()
     report = assessor.assess(case)
-    return {
+    result = {
         "case_id": report.case_id,
         "case_title": report.case_title,
         "litigation_risk_level": report.litigation_risk_level,
@@ -412,6 +432,18 @@ def risk_assessment(body: RiskIn):
         ],
     }
 
+    # Automatically enhance with AI when available.
+    case_data = body.case.model_dump()
+    risk_data = {
+        "litigation_risk_level": report.litigation_risk_level,
+        "recommendation": report.recommendation,
+        "parties": result["parties"],
+    }
+    enhancement = _llm_enhancer.enhance_risk(case_data, risk_data)
+    result["ai_enhancement"] = _enhancement_to_dict(enhancement)
+
+    return result
+
 
 # ---------------------------------------------------------------------------
 # Settlement calculator
@@ -428,7 +460,7 @@ def settlement_analysis(body: SettlementIn):
     case = _to_case(body.case)
     calc = SettlementCalculator()
     report = calc.analyze(case, body.claimed_damages)
-    return {
+    result = {
         "case_id": report.case_id,
         "case_title": report.case_title,
         "should_settle": report.should_settle,
@@ -462,14 +494,41 @@ def settlement_analysis(body: SettlementIn):
         },
     }
 
+    # Automatically enhance with AI when available.
+    case_data = body.case.model_dump()
+    settlement_data = {
+        "should_settle": report.should_settle,
+        "settlement_range": result["settlement_range"],
+        "damages_estimate": result["damages_estimate"],
+        "settlement_recommendation": report.settlement_recommendation,
+    }
+    enhancement = _llm_enhancer.enhance_settlement(case_data, settlement_data)
+    result["ai_enhancement"] = _enhancement_to_dict(enhancement)
+
+    return result
+
 
 # ---------------------------------------------------------------------------
 # LLM Enhancement endpoints
 # ---------------------------------------------------------------------------
 
-from legal_judge.engine.llm import LLMEnhancer
+from legal_judge.engine.llm import LLMEnhancer, LLMEnhancement
 
 _llm_enhancer = LLMEnhancer()
+
+
+def _enhancement_to_dict(result: LLMEnhancement) -> dict:
+    """Serialize an LLMEnhancement to a JSON-friendly dict."""
+    return {
+        "provider": result.provider,
+        "model": result.model,
+        "enhanced_opinion": result.enhanced_opinion,
+        "enhanced_reasoning": result.enhanced_reasoning,
+        "enhanced_dissent": result.enhanced_dissent,
+        "key_insights": result.key_insights,
+        "plain_english_summary": result.plain_english_summary,
+        "error": result.error,
+    }
 
 
 @app.get("/api/llm/status")
