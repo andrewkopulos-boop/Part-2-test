@@ -98,6 +98,14 @@ def test_judge_case():
     assert "opinion_markdown" in data
     assert "sections" in data
     assert data["prevailing_party"] != ""
+    # AI enhancement is always included in results.
+    assert "ai_enhancement" in data
+    ai = data["ai_enhancement"]
+    assert "provider" in ai
+    assert "enhanced_opinion" in ai
+    assert "enhanced_reasoning" in ai
+    assert "key_insights" in ai
+    assert "plain_english_summary" in ai
 
 
 def test_judge_minimal_case():
@@ -196,6 +204,9 @@ def test_panel_endpoint():
     assert "is_unanimous" in data
     assert "majority_vote" in data
     assert "majority_confidence" in data
+    # AI enhancement is always included in results.
+    assert "ai_enhancement" in data
+    assert "provider" in data["ai_enhancement"]
 
 
 # ------------------------------------------------------------------
@@ -239,6 +250,9 @@ def test_risk_endpoint():
     for p in data["parties"]:
         assert "win_probability" in p
         assert "overall_grade" in p
+    # AI enhancement is always included in results.
+    assert "ai_enhancement" in data
+    assert "provider" in data["ai_enhancement"]
 
 
 # ------------------------------------------------------------------
@@ -274,3 +288,6 @@ def test_settlement_endpoint():
     assert "cost_of_litigation_estimate" in data
     assert data["damages_estimate"]["total"] > 0
     assert data["settlement_range"]["low"] <= data["settlement_range"]["high"]
+    # AI enhancement is always included in results.
+    assert "ai_enhancement" in data
+    assert "provider" in data["ai_enhancement"]

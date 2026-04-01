@@ -17,11 +17,25 @@ let lastCaseData = null;
 // ============================================================
 // 1. INITIALIZATION
 // ============================================================
+// Loading phase messages
+var loadingPhases = [
+  'Parsing case materials...',
+  'Applying IRAC framework...',
+  'Matching relevant precedents...',
+  'Weighing evidence...',
+  'Consulting legal principles...',
+  'Drafting opinion...',
+  'Finalizing judgment...'
+];
+var loadingPhaseInterval = null;
+
 document.addEventListener('DOMContentLoaded', async () => {
   initTabs();
   initFormatToggle();
   initResultTabs();
   initKeyboardShortcuts();
+  initParticles();
+  initTabIndicator();
   await loadEnums();
   addParty('plaintiff');
   addParty('defendant');
@@ -162,9 +176,11 @@ function initTabs() {
       document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
       btn.classList.add('active');
       document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      updateTabIndicator();
       if (btn.dataset.tab === 'history') loadHistory();
     });
   });
+  window.addEventListener('resize', updateTabIndicator);
 }
 
 // ============================================================
@@ -507,6 +523,43 @@ function showLoading(msg) {
   document.getElementById('judgment-result').style.display = 'none';
   document.getElementById('judgment-loading').style.display = '';
   document.querySelector('.loading-text').textContent = msg || 'Analyzing case...';
+  startLoadingPhases();
+}
+
+function startLoadingPhases() {
+  if (loadingPhaseInterval) clearInterval(loadingPhaseInterval);
+  var phaseIdx = 0;
+  var phaseEl = document.querySelector('.phase-text');
+  var dotsEl = document.querySelector('.loading-phase-dots');
+  if (!phaseEl) return;
+  phaseEl.textContent = loadingPhases[0];
+  if (dotsEl) {
+    var dots = dotsEl.querySelectorAll('.phase-dot');
+    dots.forEach(function(d,i) { d.className = 'phase-dot' + (i === 0 ? ' active' : ''); });
+  }
+  loadingPhaseInterval = setInterval(function() {
+    phaseIdx = (phaseIdx + 1) % loadingPhases.length;
+    phaseEl.style.opacity = '0';
+    setTimeout(function() {
+      phaseEl.textContent = loadingPhases[phaseIdx];
+      phaseEl.style.opacity = '1';
+    }, 200);
+    if (dotsEl) {
+      var dots = dotsEl.querySelectorAll('.phase-dot');
+      dots.forEach(function(d,i) {
+        if (i < phaseIdx) d.className = 'phase-dot completed';
+        else if (i === phaseIdx) d.className = 'phase-dot active';
+        else d.className = 'phase-dot';
+      });
+    }
+  }, 1500);
+}
+
+function stopLoadingPhases() {
+  if (loadingPhaseInterval) {
+    clearInterval(loadingPhaseInterval);
+    loadingPhaseInterval = null;
+  }
 }
 
 function showView(viewId) {
@@ -558,6 +611,7 @@ async function submitCase() {
     activateResultTab('judgment');
     showToast('Judgment rendered successfully.', 'success');
   } catch (err) {
+    stopLoadingPhases();
     document.getElementById('judgment-loading').style.display = 'none';
     document.getElementById('judgment-empty').style.display = '';
     showToast('Error: ' + err.message, 'error');
@@ -568,21 +622,32 @@ async function submitCase() {
 // 16. RENDER JUDGMENT
 // ============================================================
 function renderJudgment(j) {
+  stopLoadingPhases();
   document.getElementById('judgment-loading').style.display = 'none';
   document.getElementById('judgment-result').style.display = '';
   document.getElementById('format-toggle').style.display = '';
 
-  // Verdict banner
+  // Verdict banner with stamp animation
   var banner = document.getElementById('verdict-banner');
-  banner.className = 'verdict-banner slide-in ' + dispositionClass(j.disposition);
-  document.getElementById('verdict-disposition').textContent = j.disposition.replace(/_/g, ' ');
-  document.getElementById('verdict-disposition').style.color = dispositionColor(j.disposition);
+  banner.className = 'verdict-banner ' + dispositionClass(j.disposition);
+  var dispEl = document.getElementById('verdict-disposition');
+  var stamp = document.getElementById('verdict-stamp');
+  if (stamp) stamp.style.animation = 'none';
+  dispEl.textContent = '';
+  dispEl.style.color = dispositionColor(j.disposition);
+  // Trigger stamp animation
+  setTimeout(function() {
+    if (stamp) { stamp.offsetHeight; stamp.style.animation = ''; }
+    typewriterEffect(dispEl, j.disposition.replace(/_/g, ' ').toUpperCase(), 60);
+  }, 100);
+  // Fire confetti
+  setTimeout(function() { fireConfetti(); }, 400);
   document.getElementById('verdict-meta').innerHTML =
     '<strong>' + escapeHtml(j.case_title) + '</strong> &mdash; ' + escapeHtml(j.date_decided) + '<br>' +
     'Prevailing party: <strong>' + escapeHtml(j.prevailing_party) + '</strong>' +
     (j.remedy !== 'none' ? ' &bull; Remedy: ' + j.remedy.replace(/_/g, ' ') : '') +
     '<br><button class="btn-why-result" onclick="openWhyThisResult()">Why this result?</button>' +
-    (llmAvailable ? ' <button class="btn-why-result btn-ai-enhance" id="btn-enhance-judgment" onclick="enhanceJudgment()"><span class="btn-icon-sm">&#9733;</span> AI Enhance</button>' : '');
+    ' <button class="btn-why-result btn-ai-enhance" id="btn-enhance-judgment" onclick="enhanceJudgment()"><span class="btn-icon-sm">&#9733;</span> AI Enhance</button>';
 
   // Score cards with confidence rings
   var cards = document.getElementById('score-cards');
@@ -595,16 +660,37 @@ function renderJudgment(j) {
   ];
   metrics.forEach(function(m, idx) {
     cards.innerHTML +=
-      '<div class="score-card slide-in" onclick="openScoreDetail(' + idx + ')" style="cursor:pointer;" title="Click for details">' +
+      '<div class="score-card card-3d" onclick="openScoreDetail(' + idx + ')" style="cursor:pointer;" title="Click for details">' +
         '<div class="score-ring">' + renderConfidenceRing(m.pct, m.color) + '</div>' +
         '<div class="score-label">' + m.label + '</div>' +
-        '<div class="score-value" style="color:' + m.color + '">' + m.value + '</div>' +
+        '<div class="score-value animated-counter" data-target="' + m.value + '" style="color:' + m.color + '">0</div>' +
         '<div class="score-bar">' +
           '<div class="score-bar-fill" style="width:' + (m.pct * 100) + '%;background:' + m.color + '"></div>' +
         '</div>' +
       '</div>';
   });
   animateConfidenceRings();
+  animateCounters();
+  initCardTilt();
+
+  // Inline AI Insights (from ai_enhancement if present)
+  var insightsEl = document.getElementById('inline-ai-insights');
+  if (j.ai_enhancement && j.ai_enhancement.plain_english_summary) {
+    insightsEl.style.display = '';
+    var insightsHTML = '<h4>&#10024; AI Insights</h4>';
+    insightsHTML += '<p style="color:var(--text-secondary);line-height:1.7;margin-bottom:0.75rem;">' +
+      escapeHtml(j.ai_enhancement.plain_english_summary) + '</p>';
+    if (j.ai_enhancement.key_insights && j.ai_enhancement.key_insights.length) {
+      insightsHTML += '<div style="display:flex;flex-wrap:wrap;gap:0.25rem;">';
+      j.ai_enhancement.key_insights.forEach(function(insight) {
+        insightsHTML += '<span class="insight-chip">&#9733; ' + escapeHtml(insight) + '</span>';
+      });
+      insightsHTML += '</div>';
+    }
+    insightsEl.innerHTML = insightsHTML;
+  } else {
+    insightsEl.style.display = 'none';
+  }
 
   // Sections
   var sectionsEl = document.getElementById('opinion-sections');
@@ -966,6 +1052,7 @@ async function submitPanel() {
     activateResultTab('panel');
     showToast('Panel decision rendered.', 'success');
   } catch (err) {
+    stopLoadingPhases();
     document.getElementById('judgment-loading').style.display = 'none';
     document.getElementById('judgment-empty').style.display = '';
     showToast('Panel error: ' + err.message, 'error');
@@ -973,6 +1060,7 @@ async function submitPanel() {
 }
 
 function renderPanel(result) {
+  stopLoadingPhases();
   showView('view-panel');
   var el = document.getElementById('panel-result');
   var unanimous = result.is_unanimous;
@@ -987,7 +1075,7 @@ function renderPanel(result) {
         'Confidence: ' + (result.majority_confidence * 100).toFixed(0) + '%' +
       '</div>' +
       '<button class="btn-why-result" onclick="openWhyPanelResult()" style="margin-top:0.75rem;">Why did the panel decide this way?</button>' +
-      (llmAvailable ? ' <button class="btn-why-result btn-ai-enhance" id="btn-enhance-panel" onclick="enhancePanel()" style="margin-top:0.75rem;"><span class="btn-icon-sm">&#9733;</span> AI Enhance</button>' : '') +
+      ' <button class="btn-why-result btn-ai-enhance" id="btn-enhance-panel" onclick="enhancePanel()" style="margin-top:0.75rem;"><span class="btn-icon-sm">&#9733;</span> AI Enhance</button>' +
     '</div>' +
     '<div style="padding:1rem 0;">' +
       '<h3 style="color:var(--gold);margin-bottom:0.5rem;">Majority Opinion</h3>' +
@@ -1092,6 +1180,7 @@ async function runRiskAssessment() {
 }
 
 function renderRisk(result) {
+  stopLoadingPhases();
   showView('view-risk');
   var el = document.getElementById('risk-result');
 
@@ -1109,7 +1198,7 @@ function renderRisk(result) {
         '<div class="risk-title">' + escapeHtml(result.case_title) + '</div>' +
       '</div>' +
       '<button class="btn-why-result" onclick="openWhyRiskResult()" style="margin-top:0.5rem;">Why this risk level?</button>' +
-      (llmAvailable ? ' <button class="btn-why-result btn-ai-enhance" id="btn-enhance-risk" onclick="enhanceRisk()" style="margin-top:0.5rem;"><span class="btn-icon-sm">&#9733;</span> AI Enhance</button>' : '') +
+      ' <button class="btn-why-result btn-ai-enhance" id="btn-enhance-risk" onclick="enhanceRisk()" style="margin-top:0.5rem;"><span class="btn-icon-sm">&#9733;</span> AI Enhance</button>' +
     '</div>' +
     '<div style="padding:0.75rem 0;color:var(--text-secondary);line-height:1.6;font-size:0.9rem;">' +
       escapeHtml(result.recommendation) +
@@ -1231,6 +1320,7 @@ async function executeSettlement() {
 }
 
 function renderSettlement(result) {
+  stopLoadingPhases();
   showView('view-settlement');
   var el = document.getElementById('settlement-result');
 
@@ -1254,7 +1344,7 @@ function renderSettlement(result) {
         escapeHtml(result.settlement_recommendation) +
       '</div>' +
       '<button class="btn-why-result" onclick="openWhySettlementResult()" style="margin-top:0.75rem;">How was this calculated?</button>' +
-      (llmAvailable ? ' <button class="btn-why-result btn-ai-enhance" id="btn-enhance-settlement" onclick="enhanceSettlement()" style="margin-top:0.75rem;"><span class="btn-icon-sm">&#9733;</span> AI Enhance</button>' : '') +
+      ' <button class="btn-why-result btn-ai-enhance" id="btn-enhance-settlement" onclick="enhanceSettlement()" style="margin-top:0.75rem;"><span class="btn-icon-sm">&#9733;</span> AI Enhance</button>' +
     '</div>' +
     '<div class="settlement-grid">' +
       '<div class="settlement-card">' +
@@ -1933,10 +2023,6 @@ function collectCaseForLLM() {
 
 async function enhanceJudgment() {
   if (!lastJudgment) { showToast('No judgment to enhance.', 'error'); return; }
-  if (!llmAvailable) {
-    showToast('No LLM API configured. Add an API key in Vercel settings.', 'error');
-    return;
-  }
   var btn = document.getElementById('btn-enhance-judgment');
   if (btn) { btn.disabled = true; btn.textContent = 'Enhancing...'; }
 
@@ -1963,10 +2049,6 @@ async function enhanceJudgment() {
 
 async function enhancePanel() {
   if (!lastPanel) { showToast('No panel decision to enhance.', 'error'); return; }
-  if (!llmAvailable) {
-    showToast('No LLM API configured. Add an API key in Vercel settings.', 'error');
-    return;
-  }
   var btn = document.getElementById('btn-enhance-panel');
   if (btn) { btn.disabled = true; btn.textContent = 'Enhancing...'; }
 
@@ -1993,10 +2075,6 @@ async function enhancePanel() {
 
 async function enhanceRisk() {
   if (!lastRisk) { showToast('No risk assessment to enhance.', 'error'); return; }
-  if (!llmAvailable) {
-    showToast('No LLM API configured. Add an API key in Vercel settings.', 'error');
-    return;
-  }
   var btn = document.getElementById('btn-enhance-risk');
   if (btn) { btn.disabled = true; btn.textContent = 'Enhancing...'; }
 
@@ -2023,10 +2101,6 @@ async function enhanceRisk() {
 
 async function enhanceSettlement() {
   if (!lastSettlement) { showToast('No settlement analysis to enhance.', 'error'); return; }
-  if (!llmAvailable) {
-    showToast('No LLM API configured. Add an API key in Vercel settings.', 'error');
-    return;
-  }
   var btn = document.getElementById('btn-enhance-settlement');
   if (btn) { btn.disabled = true; btn.textContent = 'Enhancing...'; }
 
@@ -2101,4 +2175,227 @@ function formatLLMText(text) {
   if (!text) return '';
   // Convert line breaks to <br> and escape HTML
   return escapeHtml(text).replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>');
+}
+
+// ============================================================
+// 30. PARTICLE BACKGROUND SYSTEM
+// ============================================================
+function initParticles() {
+  var canvas = document.getElementById('particles-canvas');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var particles = [];
+  var numParticles = 60;
+  var connectionDist = 120;
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  for (var i = 0; i < numParticles; i++) {
+    particles.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: -Math.random() * 0.2 - 0.05,
+      size: Math.random() * 2 + 0.5,
+      opacity: Math.random() * 0.3 + 0.1,
+      color: Math.random() > 0.7 ? '167, 139, 250' : '212, 168, 67'
+    });
+  }
+
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    particles.forEach(function(p) {
+      p.x += p.vx;
+      p.y += p.vy;
+
+      if (p.x < 0) p.x = canvas.width;
+      if (p.x > canvas.width) p.x = 0;
+      if (p.y < 0) p.y = canvas.height;
+      if (p.y > canvas.height) { p.y = canvas.height; p.vy = -Math.random() * 0.2 - 0.05; }
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(' + p.color + ', ' + p.opacity + ')';
+      ctx.fill();
+    });
+
+    // Draw connections
+    for (var i = 0; i < particles.length; i++) {
+      for (var j = i + 1; j < particles.length; j++) {
+        var dx = particles[i].x - particles[j].x;
+        var dy = particles[i].y - particles[j].y;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < connectionDist) {
+          var alpha = (1 - dist / connectionDist) * 0.08;
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.strokeStyle = 'rgba(212, 168, 67, ' + alpha + ')';
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        }
+      }
+    }
+
+    requestAnimationFrame(animate);
+  }
+  animate();
+}
+
+// ============================================================
+// 31. ANIMATED NUMBER COUNTING
+// ============================================================
+function animateCounters() {
+  document.querySelectorAll('.animated-counter').forEach(function(el) {
+    var target = el.getAttribute('data-target');
+    if (!target) return;
+    var isPercent = target.indexOf('%') !== -1;
+    var numTarget = parseInt(target);
+    if (isNaN(numTarget)) { el.textContent = target; return; }
+    var suffix = isPercent ? '%' : '';
+    var duration = 1000;
+    var start = Date.now();
+    var startVal = 0;
+
+    function update() {
+      var elapsed = Date.now() - start;
+      var progress = Math.min(elapsed / duration, 1);
+      // Ease out cubic
+      var eased = 1 - Math.pow(1 - progress, 3);
+      var current = Math.round(startVal + (numTarget - startVal) * eased);
+      el.textContent = current + suffix;
+      if (progress < 1) requestAnimationFrame(update);
+    }
+    requestAnimationFrame(update);
+  });
+}
+
+// ============================================================
+// 32. CONFETTI BURST
+// ============================================================
+function fireConfetti() {
+  var container = document.getElementById('confetti-container');
+  if (!container) return;
+  var colors = ['#d4a843', '#ecd278', '#34d399', '#60a5fa', '#a78bfa', '#fb7185', '#fbbf24'];
+  var numPieces = 100;
+  var pieces = [];
+
+  for (var i = 0; i < numPieces; i++) {
+    var piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    var color = colors[Math.floor(Math.random() * colors.length)];
+    var size = Math.random() * 8 + 4;
+    var shape = Math.random() > 0.5 ? '50%' : '0';
+    piece.style.cssText =
+      'width:' + size + 'px;height:' + (size * 0.6) + 'px;' +
+      'background:' + color + ';' +
+      'border-radius:' + shape + ';' +
+      'left:' + (40 + Math.random() * 20) + '%;' +
+      'top:30%;' +
+      'opacity:1;' +
+      'position:absolute;';
+    container.appendChild(piece);
+    pieces.push({
+      el: piece,
+      x: (40 + Math.random() * 20) / 100 * window.innerWidth,
+      y: window.innerHeight * 0.3,
+      vx: (Math.random() - 0.5) * 12,
+      vy: -Math.random() * 15 - 5,
+      rotation: Math.random() * 360,
+      rotationSpeed: (Math.random() - 0.5) * 15,
+      gravity: 0.4 + Math.random() * 0.2,
+      opacity: 1,
+      drag: 0.98
+    });
+  }
+
+  var startTime = Date.now();
+  function animateConfetti() {
+    var elapsed = Date.now() - startTime;
+    var allDone = true;
+    pieces.forEach(function(p) {
+      p.vy += p.gravity;
+      p.vx *= p.drag;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rotation += p.rotationSpeed;
+      if (elapsed > 1500) p.opacity -= 0.02;
+      if (p.opacity > 0) allDone = false;
+      p.el.style.transform = 'translate(' + p.x + 'px, ' + p.y + 'px) rotate(' + p.rotation + 'deg)';
+      p.el.style.opacity = Math.max(0, p.opacity);
+    });
+    if (!allDone && elapsed < 4000) {
+      requestAnimationFrame(animateConfetti);
+    } else {
+      container.innerHTML = '';
+    }
+  }
+  requestAnimationFrame(animateConfetti);
+}
+
+// ============================================================
+// 33. TYPEWRITER EFFECT
+// ============================================================
+function typewriterEffect(element, text, speed) {
+  speed = speed || 50;
+  element.textContent = '';
+  element.classList.add('typing-cursor');
+  var idx = 0;
+  function type() {
+    if (idx < text.length) {
+      element.textContent += text[idx];
+      idx++;
+      setTimeout(type, speed);
+    } else {
+      setTimeout(function() {
+        element.classList.remove('typing-cursor');
+      }, 1500);
+    }
+  }
+  type();
+}
+
+// ============================================================
+// 34. 3D CARD TILT EFFECT
+// ============================================================
+function initCardTilt() {
+  document.querySelectorAll('.card-3d').forEach(function(card) {
+    card.addEventListener('mousemove', function(e) {
+      var rect = card.getBoundingClientRect();
+      var x = e.clientX - rect.left;
+      var y = e.clientY - rect.top;
+      var centerX = rect.width / 2;
+      var centerY = rect.height / 2;
+      var tiltX = (y - centerY) / centerY * -5;
+      var tiltY = (x - centerX) / centerX * 5;
+      card.style.transform = 'perspective(800px) rotateX(' + tiltX + 'deg) rotateY(' + tiltY + 'deg) translateY(-4px) scale(1.02)';
+    });
+    card.addEventListener('mouseleave', function() {
+      card.style.transform = '';
+    });
+  });
+}
+
+// ============================================================
+// 35. TAB INDICATOR (Animated sliding underline)
+// ============================================================
+function initTabIndicator() {
+  updateTabIndicator();
+}
+
+function updateTabIndicator() {
+  var activeBtn = document.querySelector('.nav-btn.active');
+  var indicator = document.getElementById('tab-indicator');
+  if (!activeBtn || !indicator) return;
+  var nav = activeBtn.parentElement;
+  var navRect = nav.getBoundingClientRect();
+  var btnRect = activeBtn.getBoundingClientRect();
+  indicator.style.left = (btnRect.left - navRect.left) + 'px';
+  indicator.style.width = btnRect.width + 'px';
 }
